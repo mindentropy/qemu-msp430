@@ -9,6 +9,11 @@ config TMP105
     bool
     depends on I2C
 
+# Added TMP123, a hypothetical temperature sensor
+config TMP123
+	bool
+	depends on I2C
+
 config TMP421
     bool
     depends on I2C

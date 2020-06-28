@@ -87,6 +87,10 @@ config Q35
     select DIMM
     select SMBIOS
     select FW_CFG_DMA
+	select TMP105
+	select TMP421
+# Added TMP123, a hypothetical temperature sensor
+	select TMP123
 
 config VTD
     bool
