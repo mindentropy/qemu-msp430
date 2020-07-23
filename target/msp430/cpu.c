@@ -9,20 +9,21 @@
 
 static void msp430_cpu_initfn(Object *obj)
 {
-	
+
 }
 
 static void msp430_cpu_realizefn(
-						DeviceState *dev,
-						Error **errp)
+							DeviceState *dev,
+							Error **errp
+						)
 {
-	
+
 }
 
 
 static void msp430_cpu_reset(DeviceState *dev)
 {
-	
+
 }
 
 static ObjectClass * msp430_cpu_class_by_name(const char *cpu_model)
@@ -37,13 +38,19 @@ static bool msp430_cpu_has_work(CPUState *cpu)
 
 void msp430_cpu_set_pc(CPUState *cpu, vaddr value)
 {
-	
+
+}
+
+static void msp430_disas_set_info(CPUState *cpu, disassemble_info *info)
+{
+
 }
 
 static const VMStateDescription vmstate_msp430_cpu = {
 	.name = "cpu",
 	.unmigratable = 1,
 };
+
 
 static Property msp430_properties[] = {
 	
