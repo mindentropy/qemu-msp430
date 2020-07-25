@@ -107,5 +107,4 @@ static void msp430_cpu_register_types(void)
 	type_register_static(&msp430_cpu_type_info);
 }
 
-
 type_init(msp430_cpu_register_types);
