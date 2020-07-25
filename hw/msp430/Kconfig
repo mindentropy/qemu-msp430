@@ -1,0 +1,2 @@
+config MSP430
+	bool
