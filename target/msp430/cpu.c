@@ -33,10 +33,10 @@ static ObjectClass * msp430_cpu_class_by_name(const char *cpu_model)
 
 static bool msp430_cpu_has_work(CPUState *cpu)
 {
-
+	return true;
 }
 
-void msp430_cpu_set_pc(CPUState *cpu, vaddr value)
+static void msp430_cpu_set_pc(CPUState *cpu, vaddr value)
 {
 
 }
@@ -54,14 +54,19 @@ static const VMStateDescription vmstate_msp430_cpu = {
 
 static Property msp430_properties[] = {
 	
-	DEFINE_PROP_END_OF_LIST();
+	DEFINE_PROP_END_OF_LIST(),
 };
+
+static void msp430_cpu_do_interrupt(CPUState *cpu)
+{
+
+}
 
 static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 {
-	DeviceClass *dc = DEVICE_CLASS(oc);
+	MSP430CPUClass *mcc = MSP430_CPU_CLASS(oc);
 	CPUClass *cc = CPU_CLASS(oc);
-	MSP430CPUClass *mcc = MSP430CPUClass(oc);
+	DeviceClass *dc = DEVICE_CLASS(oc);
 
 	device_class_set_parent_realize(dc,
 					msp430_cpu_realizefn,
@@ -89,13 +94,13 @@ static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 	device_class_set_props(dc, msp430_properties);
 
 	cc->disas_set_info = msp430_disas_set_info;
-	cc->tcg_initialize = msp430_tcg_initialize;
+	cc->tcg_initialize = msp430_tcg_init;
 }
 
 static const TypeInfo msp430_cpu_type_info = {
 	.name = TYPE_MSP430_CPU,
 	.parent = TYPE_CPU,
-	.instance_size = sizeof(MSP430CPUState),
+	.instance_size = sizeof(MSP430CPU),
 	.instance_init = msp430_cpu_initfn,
 	.class_size = sizeof(MSP430CPUClass),
 	.class_init = msp430_cpu_class_init,

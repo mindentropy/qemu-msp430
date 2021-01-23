@@ -8147,6 +8147,8 @@ case "$target_name" in
   ;;
   moxie)
   ;;
+  msp430)
+  ;;
   nios2)
   ;;
   or1k)
