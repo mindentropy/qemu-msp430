@@ -12,11 +12,16 @@ typedef struct MSP430CPUClass {
 
 	DeviceRealize parent_realize;
 	DeviceReset parent_reset;
-};
+} MSP430CPUClass;
 
 #define MSP430_CPU_CLASS(klass) \
-	OBJECT_CLASS_CHECK(MSP430CPUClass, klass)
+	OBJECT_CLASS_CHECK(MSP430CPUClass, (klass), TYPE_MSP430_CPU)
 
-typedef struct MSP430CPU MSP430CPU;
+#define MSP430_CPU(obj) \
+	OBJECT_CHECK(MSP430CPU, (obj), TYPE_MSP430_CPU)
 
-#endif
+#define MSP430_CPU_GET_CLASS(obj) \
+	OBJECT_GET_CLASS(MSP430CPUClass, (obj), TYPE_MSP430_CPU)
+
+
+#endif /* QEMU_MSP430_CPU_QOM_H_ */

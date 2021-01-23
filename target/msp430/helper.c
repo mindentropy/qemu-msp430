@@ -4,14 +4,16 @@
 #include "qemu/host-utils.h"
 #include "exec/log.h"
 
-void do_interrupt(CPUState *cpu)
+bool msp430_cpu_tlb_fill(CPUState *cpu, vaddr address,
+	int size, MMUAccessType access_type,
+	int mmu_idx, bool probe, uintptr_t retaddr)
 {
-	
+	return true;
 }
 
 bool msp430_cpu_exec_interrupt(CPUState *cpu,
 							int interrupt_request)
 {
 	
-	return false;
+	return true;
 }

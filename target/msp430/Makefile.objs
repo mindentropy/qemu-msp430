@@ -1,1 +1,1 @@
-obj-y += cpu.o
+obj-y += translate.o helper.o cpu.o gdbstub.o

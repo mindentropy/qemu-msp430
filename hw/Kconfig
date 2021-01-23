@@ -52,6 +52,7 @@ source i386/Kconfig
 source m68k/Kconfig
 source microblaze/Kconfig
 source mips/Kconfig
+source msp430/Kconfig
 source nios2/Kconfig
 source openrisc/Kconfig
 source ppc/Kconfig
