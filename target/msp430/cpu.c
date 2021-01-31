@@ -9,15 +9,48 @@
 
 static void msp430_cpu_initfn(Object *obj)
 {
+	MSP430CPU *cpu = MSP430_CPU(obj);
 
+    cpu_set_cpustate_pointers(cpu);
+}
+
+static void g2452_initfn(Object *obj)
+{
+	/*
+		MSP430CPU *cpu = MSP430_CPU(obj);
+		cpu->env.features = 0;
+	*/
+
+	/*
+	* TODO: Set CPU environment features here.
+	*/
 }
 
 static void msp430_cpu_realizefn(
-							DeviceState *dev,
-							Error **errp
-						)
+					DeviceState *dev,
+					Error **errp
+				)
 {
+	CPUState *cs = CPU(dev);
+	MSP430CPUClass *mcc = MSP430_CPU_GET_CLASS(dev);
+	Error *local_err = NULL;
 
+	/* local_err does not get set here. */
+	cpu_exec_realizefn(cs, &local_err);
+
+	if(local_err != NULL) { /* Setting local_err to
+		NULL is important as the previous function
+		will not set */
+		error_propagate(errp, local_err);
+		return;
+	}
+
+	/* TODO: Check for different MSP430 CPU models and set the features */
+	cpu_reset(cs);
+	qemu_init_vcpu(cs);
+
+	mcc->parent_realize(dev, errp);
+	return;
 }
 
 
@@ -28,7 +61,18 @@ static void msp430_cpu_reset(DeviceState *dev)
 
 static ObjectClass * msp430_cpu_class_by_name(const char *cpu_model)
 {
-	return object_class_by_name(TYPE_MSP430_CPU);
+	ObjectClass *oc;
+	char *typename;
+
+	typename = g_strdup_printf(MSP430_CPU_TYPE_NAME("%s"), cpu_model);
+	oc = object_class_by_name(typename);
+	g_free(typename);
+
+	if(!oc || !object_class_dynamic_cast(oc, TYPE_MSP430_CPU) ||
+		object_class_is_abstract(oc)) {
+		return NULL;
+	}
+	return oc;
 }
 
 static bool msp430_cpu_has_work(CPUState *cpu)
@@ -97,19 +141,31 @@ static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 	cc->tcg_initialize = msp430_tcg_init;
 }
 
-static const TypeInfo msp430_cpu_type_info = {
-	.name = TYPE_MSP430_CPU,
-	.parent = TYPE_CPU,
-	.instance_size = sizeof(MSP430CPU),
-	.instance_init = msp430_cpu_initfn,
-	.class_size = sizeof(MSP430CPUClass),
-	.class_init = msp430_cpu_class_init,
+static const TypeInfo msp430_cpu_type_infos[] = {
+	{
+		.name = TYPE_MSP430_CPU,
+		.parent = TYPE_CPU,
+		.instance_size = sizeof(MSP430CPU),
+		.instance_init = msp430_cpu_initfn,
+		.abstract = true,
+		.class_size = sizeof(MSP430CPUClass),
+		.class_init = msp430_cpu_class_init,
+	},
+	{
+		.parent = TYPE_MSP430_CPU,
+		.instance_init = g2452_initfn,
+		.name = MSP430_CPU_TYPE_NAME("g2452"),
+	}
 };
 
+DEFINE_TYPES(msp430_cpu_type_infos)
 
+/* Commented out below as we will register multiple MSP430 types  */
+/*
 static void msp430_cpu_register_types(void)
 {
 	type_register_static(&msp430_cpu_type_info);
 }
 
-type_init(msp430_cpu_register_types);
+type_init(msp430_cpu_register_types)
+*/
