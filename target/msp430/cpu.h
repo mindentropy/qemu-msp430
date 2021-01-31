@@ -8,9 +8,11 @@
 #define MSP430_CPU_TYPE_NAME(model) model MSP430_CPU_TYPE_SUFFIX
 #define CPU_RESOLVING_TYPE TYPE_MSP430_CPU
 
-typedef struct CPUMSP430State {
+typedef struct CPUMSP430State CPUMSP430State;
+
+struct CPUMSP430State {
 	uint16_t PC;
-} CPUMSP430State;
+};
 
 /*
 	A MSP430 CPU

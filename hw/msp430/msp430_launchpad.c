@@ -29,7 +29,7 @@ static void msp430_load_kernel(CPUMSP430State *env, const char *filename)
 				0);
 
 	if(kernel_size <= 0) {
-		error_report("no kernel file :  '%s'", filename);
+		error_report("no kernel file : '%s'", filename);
 		exit(1);
 	}
 	env->PC = entry;

@@ -23,5 +23,4 @@ typedef struct MSP430CPUClass {
 #define MSP430_CPU_GET_CLASS(obj) \
 	OBJECT_GET_CLASS(MSP430CPUClass, (obj), TYPE_MSP430_CPU)
 
-
 #endif /* QEMU_MSP430_CPU_QOM_H_ */
