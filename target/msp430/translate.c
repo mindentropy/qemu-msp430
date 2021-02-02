@@ -39,3 +39,11 @@ void restore_state_to_opc(
 {
 
 }
+
+void cpu_state_reset(CPUMSP430State *env)
+{
+	/*
+		TODO:Reset the registers to default state
+	*/
+
+}
