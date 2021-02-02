@@ -32,7 +32,7 @@ static void msp430_load_kernel(CPUMSP430State *env, const char *filename)
 		error_report("no kernel file : '%s'", filename);
 		exit(1);
 	}
-	env->PC = entry;
+	env->PC_r0 = entry;
 }
 
 static void msp430_launchpad_init(MachineState *machine)

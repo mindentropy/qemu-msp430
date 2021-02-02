@@ -56,7 +56,15 @@ static void msp430_cpu_realizefn(
 
 static void msp430_cpu_reset(DeviceState *dev)
 {
+	CPUState *s = CPU(dev);
+	MSP430CPU *cpu = MSP430_CPU(s);
 
+	MSP430CPUClass *mcc = MSP430_CPU_GET_CLASS(cpu);
+	CPUMSP430State *env = &cpu->env;
+
+	mcc->parent_reset(dev);
+
+	cpu_state_reset(env);
 }
 
 static ObjectClass * msp430_cpu_class_by_name(const char *cpu_model)
@@ -80,9 +88,12 @@ static bool msp430_cpu_has_work(CPUState *cpu)
 	return true;
 }
 
-static void msp430_cpu_set_pc(CPUState *cpu, vaddr value)
+static void msp430_cpu_set_pc(CPUState *cs, vaddr value)
 {
+	MSP430CPU *cpu = MSP430_CPU(cs);
+	CPUMSP430State *env = &cpu->env;
 
+	env->PC_r0 = value & ~(target_ulong)1;
 }
 
 static void msp430_disas_set_info(CPUState *cpu, disassemble_info *info)
@@ -106,6 +117,11 @@ static void msp430_cpu_do_interrupt(CPUState *cpu)
 
 }
 
+static gchar *msp430_gdb_arch_name(CPUState *cs)
+{
+	return g_strdup("msp430");
+}
+
 static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 {
 	MSP430CPUClass *mcc = MSP430_CPU_CLASS(oc);
@@ -127,6 +143,9 @@ static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 	cc->set_pc = msp430_cpu_set_pc;
 	cc->gdb_read_register = msp430_cpu_gdb_read_register;
 	cc->gdb_write_register = msp430_cpu_gdb_write_register;
+	cc->gdb_num_core_regs = 1; /* TODO: Setup core registers */
+
+	cc->gdb_arch_name = msp430_gdb_arch_name;
 	cc->tlb_fill = msp430_cpu_tlb_fill;
 
 	/* Is the below really needed? No VMEM support in the microcontroller!!!
