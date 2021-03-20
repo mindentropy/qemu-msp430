@@ -10,9 +10,11 @@ common-obj-$(CONFIG_ONENAND) += onenand.o
 common-obj-$(CONFIG_SWIM) += swim.o
 
 common-obj-$(CONFIG_SH4) += tc58128.o
+common-obj-$(CONFIG_MSP430G2xxx_FLASH) += msp430g2xxx_flashrom.o
 
 obj-$(CONFIG_VIRTIO_BLK) += virtio-blk.o
 obj-$(CONFIG_VHOST_USER_BLK) += vhost-user-blk.o
 common-obj-$(CONFIG_NVME_PCI) += nvme.o
+
 
 obj-y += dataplane/
