@@ -8,27 +8,23 @@
 #define MSP430_CPU_TYPE_NAME(model) model MSP430_CPU_TYPE_SUFFIX
 #define CPU_RESOLVING_TYPE TYPE_MSP430_CPU
 
-typedef struct CPUMSP430State CPUMSP430State;
+#define MSP430_NUM_REGISTERS 	(16)
+
+#define MSP430_PC_REG 			(0)
+#define MSP430_SP_REG 			(1)
+#define MSP430_SR_REG 			(2)
+#define MSP430_CG2_REG 			(3)
+
+#define MSP430_FLASH_BASE 		(0xE000)
+#define MSP430_FLASH_SIZE 		(0x2000)
+
+#define MSP430_SRAM_BASE 		(0x200)
+#define MSP430_SRAM_SIZE 		(0x100)
 
 typedef struct CPUMSP430State CPUMSP430State;
 
 struct CPUMSP430State {
-	uint16_t PC_r0;
-	uint16_t SP_r1;
-	uint16_t r2_sr_cg1;
-	uint16_t r3_cg2;
-	uint16_t r4;
-	uint16_t r5;
-	uint16_t r6;
-	uint16_t r7;
-	uint16_t r8;
-	uint16_t r9;
-	uint16_t r10;
-	uint16_t r11;
-	uint16_t r12;
-	uint16_t r13;
-	uint16_t r14;
-	uint16_t r15;
+	uint16_t regs[16];
 };
 
 /*
@@ -56,7 +52,7 @@ static inline int cpu_mmu_index(CPUMSP430State *env, bool ifetch)
 static inline void cpu_get_tb_cpu_state(CPUMSP430State *env, target_ulong *pc,
 								target_ulong *cs_base, uint32_t *flags)
 {
-	*pc = env->PC_r0;
+	*pc = env->regs[MSP430_PC_REG];
 	*cs_base = 0;
 	*flags = 0;
 }

@@ -31,7 +31,7 @@ static void msp430_cpu_realizefn(
 					Error **errp
 				)
 {
-	CPUState *cs = CPU(dev);
+	CPUState *cs = CPU(dev); // DeviceState <- CPUState
 	MSP430CPUClass *mcc = MSP430_CPU_GET_CLASS(dev);
 	Error *local_err = NULL;
 
@@ -57,7 +57,7 @@ static void msp430_cpu_realizefn(
 static void msp430_cpu_reset(DeviceState *dev)
 {
 	CPUState *s = CPU(dev);
-	MSP430CPU *cpu = MSP430_CPU(s);
+	MSP430CPU *cpu = MSP430_CPU(s); // DeviceState <- CpuState <- MSP430CPU
 
 	MSP430CPUClass *mcc = MSP430_CPU_GET_CLASS(cpu);
 	CPUMSP430State *env = &cpu->env;
@@ -91,9 +91,8 @@ static bool msp430_cpu_has_work(CPUState *cpu)
 static void msp430_cpu_set_pc(CPUState *cs, vaddr value)
 {
 	MSP430CPU *cpu = MSP430_CPU(cs);
-	CPUMSP430State *env = &cpu->env;
 
-	env->PC_r0 = value & ~(target_ulong)1;
+	cpu->env.regs[MSP430_PC_REG] = value & 0xFFFE;
 }
 
 static void msp430_disas_set_info(CPUState *cpu, disassemble_info *info)
