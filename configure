@@ -5377,7 +5377,6 @@ for i in $ARCH $TARGET_BASE_ARCH ; do
     disas_config "XTENSA"
   ;;
   esac
->>>>>>> 7621d6d1a6 (Basic MSP430 support to build qemu-system-msp430)
 done
 
 echo "CONFIG_QEMU_INTERP_PREFIX=$interp_prefix" | sed 's/%M/@0@/' >> $config_host_mak
