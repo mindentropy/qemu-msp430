@@ -121,6 +121,15 @@ static gchar *msp430_gdb_arch_name(CPUState *cs)
 	return g_strdup("msp430");
 }
 
+#include "hw/core/tcg-cpu-ops.h"
+
+struct TCGCPUOps msp430_tcg_ops = {
+	.tlb_fill = msp430_cpu_tlb_fill,
+	.initialize = msp430_tcg_init,
+	.cpu_exec_interrupt = msp430_cpu_exec_interrupt,
+	.do_interrupt = msp430_cpu_do_interrupt,
+};
+
 static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 {
 	MSP430CPUClass *mcc = MSP430_CPU_CLASS(oc);
@@ -136,8 +145,8 @@ static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 					&mcc->parent_reset);
 	cc->class_by_name = msp430_cpu_class_by_name;
 	cc->has_work = msp430_cpu_has_work;
-	cc->do_interrupt = msp430_cpu_do_interrupt;
-	cc->cpu_exec_interrupt = msp430_cpu_exec_interrupt;
+/*	cc->do_interrupt = msp430_cpu_do_interrupt;*/
+	/*cc->cpu_exec_interrupt = msp430_cpu_exec_interrupt;*/
 	cc->dump_state = msp430_cpu_dump_state;
 	cc->set_pc = msp430_cpu_set_pc;
 	cc->gdb_read_register = msp430_cpu_gdb_read_register;
@@ -145,7 +154,8 @@ static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 	cc->gdb_num_core_regs = 1; /* TODO: Setup core registers */
 
 	cc->gdb_arch_name = msp430_gdb_arch_name;
-	cc->tlb_fill = msp430_cpu_tlb_fill;
+	cc->tcg_ops = &msp430_tcg_ops;
+/*	cc->tlb_fill = msp430_cpu_tlb_fill;*/
 
 	/* Is the below really needed? No VMEM support in the microcontroller!!!
 #ifdef CONFIG_USER_ONLY
@@ -156,7 +166,7 @@ static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 	device_class_set_props(dc, msp430_properties);
 
 	cc->disas_set_info = msp430_disas_set_info;
-	cc->tcg_initialize = msp430_tcg_init;
+/*	cc->tcg_initialize = msp430_tcg_init;*/
 }
 
 static const TypeInfo msp430_cpu_type_infos[] = {

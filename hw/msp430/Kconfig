@@ -1,2 +1,5 @@
 config MSP430
 	bool
+
+config MSP430_LAUNCHPAD
+	select MSP430
