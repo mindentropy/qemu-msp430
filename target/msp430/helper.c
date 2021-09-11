@@ -17,3 +17,8 @@ bool msp430_cpu_exec_interrupt(CPUState *cpu,
 	
 	return true;
 }
+
+hwaddr msp430_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr)
+{
+	return addr; /* 1:1 mapping, no MMU and hence no virtual memory address */
+}

@@ -15,8 +15,9 @@
 #define MSP430_SR_REG 			(2)
 #define MSP430_CG2_REG 			(3)
 
-#define MSP430_FLASH_BASE 		(0xE000)
-#define MSP430_FLASH_SIZE 		(0x2000)
+/* G2553 sizes */
+#define MSP430_FLASH_BASE 		(0xC000)
+#define MSP430_FLASH_SIZE 		(0x4000)
 
 #define MSP430_SRAM_BASE 		(0x200)
 #define MSP430_SRAM_SIZE 		(0x100)
@@ -69,6 +70,8 @@ bool msp430_cpu_tlb_fill(CPUState *cpu, vaddr address,
 
 bool msp430_cpu_exec_interrupt(CPUState *cpu,
 	int interrupt_request);
+
+hwaddr msp430_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr);
 
 
 #endif

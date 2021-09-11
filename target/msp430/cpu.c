@@ -14,7 +14,7 @@ static void msp430_cpu_initfn(Object *obj)
     cpu_set_cpustate_pointers(cpu);
 }
 
-static void g2452_initfn(Object *obj)
+static void g2553_initfn(Object *obj)
 {
 	/*
 		MSP430CPU *cpu = MSP430_CPU(obj);
@@ -103,6 +103,8 @@ static void msp430_disas_set_info(CPUState *cpu, disassemble_info *info)
 static const VMStateDescription vmstate_msp430_cpu = {
 	.name = "cpu",
 	.unmigratable = 1,
+	.version_id = 1,
+	.minimum_version_id = 1,
 };
 
 
@@ -120,6 +122,12 @@ static gchar *msp430_gdb_arch_name(CPUState *cs)
 {
 	return g_strdup("msp430");
 }
+
+#include "hw/core/sysemu-cpu-ops.h"
+
+static const struct SysemuCPUOps msp430_sysemu_ops = {
+	.get_phys_page_debug = msp430_cpu_get_phys_page_debug,
+};
 
 #include "hw/core/tcg-cpu-ops.h"
 
@@ -145,8 +153,6 @@ static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 					&mcc->parent_reset);
 	cc->class_by_name = msp430_cpu_class_by_name;
 	cc->has_work = msp430_cpu_has_work;
-/*	cc->do_interrupt = msp430_cpu_do_interrupt;*/
-	/*cc->cpu_exec_interrupt = msp430_cpu_exec_interrupt;*/
 	cc->dump_state = msp430_cpu_dump_state;
 	cc->set_pc = msp430_cpu_set_pc;
 	cc->gdb_read_register = msp430_cpu_gdb_read_register;
@@ -154,13 +160,12 @@ static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 	cc->gdb_num_core_regs = 1; /* TODO: Setup core registers */
 
 	cc->gdb_arch_name = msp430_gdb_arch_name;
+	cc->sysemu_ops = &msp430_sysemu_ops;
 	cc->tcg_ops = &msp430_tcg_ops;
-/*	cc->tlb_fill = msp430_cpu_tlb_fill;*/
 
 	/* Is the below really needed? No VMEM support in the microcontroller!!!
 #ifdef CONFIG_USER_ONLY
 	cc->do_transaction_failed = msp430_cpu_do_transaction_failed;
-	cc->get_phys_page_debug = msp430_cpu_get_phys_page_debug;  
  #endif */
 	dc->vmsd = &vmstate_msp430_cpu;
 	device_class_set_props(dc, msp430_properties);
@@ -175,14 +180,14 @@ static const TypeInfo msp430_cpu_type_infos[] = {
 		.parent = TYPE_CPU,
 		.instance_size = sizeof(MSP430CPU),
 		.instance_init = msp430_cpu_initfn,
-		.abstract = true,
 		.class_size = sizeof(MSP430CPUClass),
 		.class_init = msp430_cpu_class_init,
+		.abstract = true,
 	},
 	{
 		.parent = TYPE_MSP430_CPU,
-		.instance_init = g2452_initfn,
-		.name = MSP430_CPU_TYPE_NAME("g2452"),
+		.instance_init = g2553_initfn,
+		.name = MSP430_CPU_TYPE_NAME("g2553"),
 	}
 };
 

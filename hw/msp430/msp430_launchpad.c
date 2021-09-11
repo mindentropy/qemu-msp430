@@ -34,8 +34,8 @@ static void msp430_launchpad_init(MachineState *machine)
 {
 	struct MSP430CPU *cpu;
 	CPUMSP430State *env;
-	MemoryRegion *sysmem, *sram;
-	DeviceState *flashrom;
+	MemoryRegion *sysmem, *sram, *flash_ram;
+	/*DeviceState *flashrom;*/
 
 	cpu = MSP430_CPU(cpu_create(machine->cpu_type));
 	env = &cpu->env;
@@ -55,10 +55,28 @@ static void msp430_launchpad_init(MachineState *machine)
 						sram
 					);
 
+	flash_ram = g_new(MemoryRegion, 2);
+	memory_region_init_ram(
+						flash_ram,
+						NULL,
+						"msp430.flash_ram",
+						MSP430_FLASH_SIZE,
+						&error_fatal
+					);
+	memory_region_add_subregion(
+						sysmem,
+						MSP430_FLASH_BASE,
+						flash_ram
+					);
+
+	/*
+	 * TODO: Test with loading the code to RAM. Create MemoryRegion spanning
+	 * the entire memory space of RAM and Flash ROM and then load the firmware
+	 */
 	/* Create Flash and Flash Controller */
-	flashrom = qdev_new("msp430G2xxx_flashrom"); /* Type created in hw/block */
-	sysbus_realize_and_unref(SYS_BUS_DEVICE(flashrom), &error_fatal);
-	sysbus_mmio_map(SYS_BUS_DEVICE(flashrom), 0, MSP430_FLASH_BASE);
+	/*flashrom = qdev_new("msp430G2xxx_flashrom"); */ /* Type created in hw/block */
+/*	sysbus_realize_and_unref(SYS_BUS_DEVICE(flashrom), &error_fatal);
+	sysbus_mmio_map(SYS_BUS_DEVICE(flashrom), 0, MSP430_FLASH_BASE);*/
 
 	if(machine->kernel_filename) {
 		msp430_load_kernel(env, machine->kernel_filename);
@@ -69,7 +87,7 @@ static void msp430_machine_init(MachineClass *mc)
 {
 	mc->desc = "MSP430 Launchpad board";
 	mc->init = msp430_launchpad_init;
-	mc->default_cpu_type = MSP430_CPU_TYPE_NAME("g2452");
+	mc->default_cpu_type = MSP430_CPU_TYPE_NAME("g2553");
 }
 
 DEFINE_MACHINE("msp430-launchpad", msp430_machine_init)
