@@ -1,7 +1,7 @@
 #ifndef MSP430_CPU_PARAM_H
-#define MSP430_CPU_PARAM_H 1
+#define MSP430_CPU_PARAM_H
 
-/* TODO: Needs to revisit this */
+/* TODO: Need to revisit this */
 #define TARGET_LONG_BITS 32
 #define TARGET_PAGE_BITS 10 /* 1k */
 
