@@ -14,6 +14,20 @@
 
 #include "exec/gen-icount.h"
 
+/*
+ *  Referencing the following archs for writing translation code:
+ *  1. AVR
+ *  2. Microblaze
+ *  3. Tricore
+ *
+ */
+
+enum {
+	DISAS_EXIT = DISAS_TARGET_0, /* We want return to the cpu main loop */
+	DISAS_LOOKUP = DISAS_TARGET_1, /* We have a variable condition exit */
+	DISAS_CHAIN = DISAS_TARGET_2,  /* We have a single condition exit. */
+};
+
 static const char *regnames[MSP430_NUM_REGISTERS] = {
 	"r0", "r1", "r2", "r3", "r4", "r5",
 	"r6", "r7", "r8", "r9", "r10", "r11",
@@ -25,10 +39,11 @@ typedef struct DisasContext DisasContext;
 
 struct DisasContext { /* Holds current CPU state Information */
 	DisasContextBase base;
-	target_ulong next_pc;
+	target_ulong next_pc; //TODO:Is this redundant??
 	CPUState *cpu_state;
 	CPUMSP430State *msp430_cpu_state;
 	uint32_t opcode; /* TODO: Can be removed? */
+	TCGCond skip_cond;
 };
 
 
@@ -63,14 +78,18 @@ static void msp430_disas_ctx_dump_state(DisasContextBase *dcbase)
 	qemu_fprintf(stderr, "==============\n");
 }
 
-static void  msp430_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cpu)
+static void  msp430_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
 {
 	qemu_fprintf(stderr, "===%s:%d===\n",__PRETTY_FUNCTION__, __LINE__);
 
-	DisasContext *dc __attribute__((unused)) = container_of(dcbase, DisasContext, base);
-	CPUMSP430State *env __attribute__((unused)) = cpu->env_ptr;
+	DisasContext *ctx __attribute__((unused)) = container_of(dcbase, DisasContext, base);
+	CPUMSP430State *env __attribute__((unused)) = cs->env_ptr;
 
-	dcbase->max_insns = 1;
+	ctx->cpu_state = cs;
+	ctx->msp430_cpu_state = env;
+	ctx->skip_cond = TCG_COND_NEVER;
+
+	ctx->base.max_insns = 1;
 }
 
 static void msp430_tr_tb_start(DisasContextBase *dcbase, CPUState *cpu)
@@ -85,11 +104,6 @@ static void msp430_tr_insn_start(DisasContextBase *dcbase, CPUState *cpu)
 	tcg_gen_insn_start(dcbase->pc_next);
 }
 
- __attribute__((unused)) static void translate(DisasContext *ctx)
-{
-
-}
-
 static void msp430_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 {
 	uint32_t opcode;
@@ -99,10 +113,12 @@ static void msp430_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 	CPUMSP430State *env = cpu->env_ptr;
 
 	opcode = cpu_lduw_code(env, ctx->base.pc_next);
+	qemu_fprintf(stderr, "Opcode: %u\n", opcode);
+
 	msp430_disas_ctx_dump_state(dcbase);
 	ctx->opcode = opcode;
-	ctx->base.pc_next += 2;
-	ctx->next_pc += 2;
+	ctx->base.pc_next += 2; //16 bit instruction, hence increase it by 2 bytes
+	ctx->next_pc += 2; //TODO: Redundant next_pc ???
 
 	if(ctx->base.is_jmp == DISAS_NEXT) {
 		target_ulong page_start;
@@ -117,18 +133,60 @@ static void msp430_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 
 static void gen_goto_tb(DisasContext *ctx, int n, target_ulong dest)
 {
+	if(translator_use_goto_tb(&ctx->base, dest)) {
+	/* is goto_tb allowed between the current TB and destination PC. See translator.h */
+		tcg_gen_goto_tb(n);
+		tcg_gen_movi_i32(TCGV_CPU_PC, dest);
+		tcg_gen_exit_tb(ctx->base.tb, n);
+	} else {
+		tcg_gen_movi_i32(TCGV_CPU_PC, dest);
 
+		if(ctx->base.singlestep_enabled) {
+			gen_helper_debug(cpu_env); /*TODO: Need more info on this helper function */
+		} else {
+			tcg_gen_lookup_and_goto_ptr();
+		}
+	}
+
+	ctx->base.is_jmp = DISAS_NORETURN;
 }
 
 static void msp430_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
 {
 	DisasContext *ctx = container_of(dcbase, DisasContext, base);
 
+	qemu_fprintf(stderr, "is_jmp: %d\n", ctx->base.is_jmp);
+
 	switch(ctx->base.is_jmp) {
-		case DISAS_TOO_MANY:
-			gen_goto_tb(ctx, 0, ctx->base.pc_next);
-			break;
 		case DISAS_NORETURN:
+			break;
+		case DISAS_NEXT:
+		case DISAS_TOO_MANY:
+			qemu_fprintf(stderr, "DISAS_TOO_MANY ===%s:%d===\n", __PRETTY_FUNCTION__, __LINE__);
+			gen_goto_tb(ctx, 0, ctx->base.pc_next);
+			return;
+		case DISAS_CHAIN:
+			qemu_fprintf(stderr, "DISAS_CHAIN ===%s:%d===\n",__PRETTY_FUNCTION__, __LINE__);
+
+			{
+				gen_goto_tb(ctx, 1, ctx->base.pc_next);
+				break;
+			}
+			tcg_gen_movi_tl(TCGV_CPU_PC, ctx->next_pc);
+			/* fall through */
+		case DISAS_LOOKUP:
+			qemu_fprintf(stderr, "DISAS_LOOKUP ===%s:%d===\n",__PRETTY_FUNCTION__, __LINE__);
+			if(!ctx->base.singlestep_enabled) {
+				tcg_gen_lookup_and_goto_ptr();
+				break;
+			}
+			/* fall through */
+		case DISAS_EXIT:
+			if(ctx->base.singlestep_enabled) {
+				gen_helper_debug(cpu_env); /* TODO: How does this work? */
+			} else {
+				tcg_gen_exit_tb(NULL, 0);
+			}
 			break;
 		default:
 			g_assert_not_reached();
@@ -185,7 +243,7 @@ void gen_intermediate_code(
 {
 	qemu_fprintf(stderr, "===%s:%d===\n", __PRETTY_FUNCTION__, __LINE__);
 	DisasContext dc = { };
-	translator_loop(&msp430_tr_ops, &dc.base, cs,tb, max_insns);
+	translator_loop(&msp430_tr_ops, &dc.base, cs, tb, max_insns);
 }
 
 void restore_state_to_opc(
