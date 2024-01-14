@@ -1,12 +1,14 @@
+.. _ci:
+
 ==
 CI
 ==
 
-QEMU has configurations enabled for a number of different CI services.
-The most up to date information about them and their status can be
-found at::
+Most of QEMU's CI is run on GitLab's infrastructure although a number
+of other CI services are used for specialised purposes. The most up to
+date information about them and their status can be found on the
+`project wiki testing page <https://wiki.qemu.org/Testing/CI>`_.
 
-   https://wiki.qemu.org/Testing/CI
-
-.. include:: ci-jobs.rst
-.. include:: ci-runners.rst
+.. include:: ci-definitions.rst.inc
+.. include:: ci-jobs.rst.inc
+.. include:: ci-runners.rst.inc
