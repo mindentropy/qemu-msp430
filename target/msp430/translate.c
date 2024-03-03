@@ -66,8 +66,8 @@ static void msp430_disas_ctx_dump_state(DisasContextBase *dcbase)
 	DisasContext *ctx = container_of(dcbase, DisasContext, base);
 	qemu_fprintf(stderr, "CTX Dump State\n");
 	qemu_fprintf(stderr, "==============\n");
-	qemu_fprintf(stderr,"pc_next %u\n", ctx->base.pc_first);
-	qemu_fprintf(stderr,"pc_next %u\n", ctx->base.pc_next);
+	qemu_fprintf(stderr,"pc_next %lu\n", ctx->base.pc_first);
+	qemu_fprintf(stderr,"pc_next %lu\n", ctx->base.pc_next);
 	qemu_fprintf(stderr,"is_jmp %u\n", ctx->base.is_jmp);
 	qemu_fprintf(stderr,"max_insns %u\n", ctx->base.max_insns);
 	qemu_fprintf(stderr,"num_insns %u\n", ctx->base.num_insns);
@@ -236,7 +236,7 @@ void gen_intermediate_code(
 			CPUState *cs,
 			TranslationBlock *tb,
 			int *max_insns,
-			target_ulong pc,
+			vaddr pc,
 			void *host_pc)
 {
 	qemu_fprintf(stderr, "===%s:%d===\n", __PRETTY_FUNCTION__, __LINE__);

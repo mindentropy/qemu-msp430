@@ -38,11 +38,6 @@ struct ArchCPU {
 	CPUNegativeOffsetState neg;
 };
 
-static inline int cpu_mmu_index(CPUMSP430State *env, bool ifetch)
-{
-	return 0;
-}
-
 #include "exec/cpu-all.h"
 
 static inline void cpu_get_tb_cpu_state(CPUMSP430State *env, vaddr *pc,
