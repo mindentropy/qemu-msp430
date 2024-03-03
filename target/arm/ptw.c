@@ -95,7 +95,10 @@ static const uint8_t pamax_map[] = {
     [6] = 52,
 };
 
-/* The cpu-specific constant value of PAMax; also used by hw/arm/virt. */
+/*
+ * The cpu-specific constant value of PAMax; also used by hw/arm/virt.
+ * Note that machvirt_init calls this on a CPU that is inited but not realized!
+ */
 unsigned int arm_pamax(ARMCPU *cpu)
 {
     if (arm_feature(&cpu->env, ARM_FEATURE_AARCH64)) {
@@ -110,13 +113,8 @@ unsigned int arm_pamax(ARMCPU *cpu)
         return pamax_map[parange];
     }
 
-    /*
-     * In machvirt_init, we call arm_pamax on a cpu that is not fully
-     * initialized, so we can't rely on the propagation done in realize.
-     */
-    if (arm_feature(&cpu->env, ARM_FEATURE_LPAE) ||
-        arm_feature(&cpu->env, ARM_FEATURE_V7VE)) {
-        /* v7 with LPAE */
+    if (arm_feature(&cpu->env, ARM_FEATURE_LPAE)) {
+        /* v7 or v8 with LPAE */
         return 40;
     }
     /* Anything else */
@@ -713,8 +711,68 @@ static uint64_t arm_casq_ptw(CPUARMState *env, uint64_t old_val,
     void *host = ptw->out_host;
 
     if (unlikely(!host)) {
-        fi->type = ARMFault_UnsuppAtomicUpdate;
-        return 0;
+        /* Page table in MMIO Memory Region */
+        CPUState *cs = env_cpu(env);
+        MemTxAttrs attrs = {
+            .space = ptw->out_space,
+            .secure = arm_space_is_secure(ptw->out_space),
+        };
+        AddressSpace *as = arm_addressspace(cs, attrs);
+        MemTxResult result = MEMTX_OK;
+        bool need_lock = !bql_locked();
+
+        if (need_lock) {
+            bql_lock();
+        }
+        if (ptw->out_be) {
+            cur_val = address_space_ldq_be(as, ptw->out_phys, attrs, &result);
+            if (unlikely(result != MEMTX_OK)) {
+                fi->type = ARMFault_SyncExternalOnWalk;
+                fi->ea = arm_extabort_type(result);
+                if (need_lock) {
+                    bql_unlock();
+                }
+                return old_val;
+            }
+            if (cur_val == old_val) {
+                address_space_stq_be(as, ptw->out_phys, new_val, attrs, &result);
+                if (unlikely(result != MEMTX_OK)) {
+                    fi->type = ARMFault_SyncExternalOnWalk;
+                    fi->ea = arm_extabort_type(result);
+                    if (need_lock) {
+                        bql_unlock();
+                    }
+                    return old_val;
+                }
+                cur_val = new_val;
+            }
+        } else {
+            cur_val = address_space_ldq_le(as, ptw->out_phys, attrs, &result);
+            if (unlikely(result != MEMTX_OK)) {
+                fi->type = ARMFault_SyncExternalOnWalk;
+                fi->ea = arm_extabort_type(result);
+                if (need_lock) {
+                    bql_unlock();
+                }
+                return old_val;
+            }
+            if (cur_val == old_val) {
+                address_space_stq_le(as, ptw->out_phys, new_val, attrs, &result);
+                if (unlikely(result != MEMTX_OK)) {
+                    fi->type = ARMFault_SyncExternalOnWalk;
+                    fi->ea = arm_extabort_type(result);
+                    if (need_lock) {
+                        bql_unlock();
+                    }
+                    return old_val;
+                }
+                cur_val = new_val;
+            }
+        }
+        if (need_lock) {
+            bql_unlock();
+        }
+        return cur_val;
     }
 
     /*

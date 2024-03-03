@@ -552,39 +552,58 @@ if get_option('cfi')
   add_global_link_arguments(cfi_flags, native: false, language: all_languages)
 endif
 
+# Check further flags that make QEMU more robust against malicious parties
+
+hardening_flags = [
+    # Zero out registers used during a function call
+    # upon its return. This makes it harder to assemble
+    # ROP gadgets into something usable
+    '-fzero-call-used-regs=used-gpr',
+
+    # Initialize all stack variables to zero. This makes
+    # it harder to take advantage of uninitialized stack
+    # data to drive exploits
+    '-ftrivial-auto-var-init=zero',
+]
+
+qemu_common_flags += cc.get_supported_arguments(hardening_flags)
+
 add_global_arguments(qemu_common_flags, native: false, language: all_languages)
 add_global_link_arguments(qemu_ldflags, native: false, language: all_languages)
 
-# Collect warnings that we want to enable
-
+# Collect warning flags we want to set, sorted alphabetically
 warn_flags = [
-  '-Wundef',
-  '-Wwrite-strings',
-  '-Wmissing-prototypes',
-  '-Wstrict-prototypes',
-  '-Wredundant-decls',
-  '-Wold-style-declaration',
-  '-Wold-style-definition',
-  '-Wtype-limits',
-  '-Wformat-security',
-  '-Wformat-y2k',
-  '-Winit-self',
-  '-Wignored-qualifiers',
+  # First enable interesting warnings
   '-Wempty-body',
-  '-Wnested-externs',
   '-Wendif-labels',
   '-Wexpansion-to-defined',
+  '-Wformat-security',
+  '-Wformat-y2k',
+  '-Wignored-qualifiers',
   '-Wimplicit-fallthrough=2',
+  '-Winit-self',
   '-Wmissing-format-attribute',
+  '-Wmissing-prototypes',
+  '-Wnested-externs',
+  '-Wold-style-declaration',
+  '-Wold-style-definition',
+  '-Wredundant-decls',
+  '-Wshadow=local',
+  '-Wstrict-prototypes',
+  '-Wtype-limits',
+  '-Wundef',
+  '-Wvla',
+  '-Wwrite-strings',
+
+  # Then disable some undesirable warnings
+  '-Wno-gnu-variable-sized-type-not-at-end',
   '-Wno-initializer-overrides',
   '-Wno-missing-include-dirs',
+  '-Wno-psabi',
   '-Wno-shift-negative-value',
   '-Wno-string-plus-int',
-  '-Wno-typedef-redefinition',
   '-Wno-tautological-type-limit-compare',
-  '-Wno-psabi',
-  '-Wno-gnu-variable-sized-type-not-at-end',
-  '-Wshadow=local',
+  '-Wno-typedef-redefinition',
 ]
 
 if host_os != 'darwin'
@@ -1615,6 +1634,7 @@ endif
 gcrypt = not_found
 nettle = not_found
 hogweed = not_found
+crypto_sm4 = not_found
 xts = 'none'
 
 if get_option('nettle').enabled() and get_option('gcrypt').enabled()
@@ -1640,6 +1660,17 @@ if not gnutls_crypto.found()
          cc.find_library('gpg-error', required: true)],
         version: gcrypt.version())
     endif
+    crypto_sm4 = gcrypt
+    # SM4 ALG is available in libgcrypt >= 1.9
+    if gcrypt.found() and not cc.links('''
+      #include <gcrypt.h>
+      int main(void) {
+        gcry_cipher_hd_t handler;
+        gcry_cipher_open(&handler, GCRY_CIPHER_SM4, GCRY_CIPHER_MODE_ECB, 0);
+        return 0;
+      }''', dependencies: gcrypt)
+      crypto_sm4 = not_found
+    endif
   endif
   if (not get_option('nettle').auto() or have_system) and not gcrypt.found()
     nettle = dependency('nettle', version: '>=3.4',
@@ -1647,6 +1678,18 @@ if not gnutls_crypto.found()
                         required: get_option('nettle'))
     if nettle.found() and not cc.has_header('nettle/xts.h', dependencies: nettle)
       xts = 'private'
+    endif
+    crypto_sm4 = nettle
+    # SM4 ALG is available in nettle >= 3.9
+    if nettle.found() and not cc.links('''
+      #include <nettle/sm4.h>
+      int main(void) {
+        struct sm4_ctx ctx;
+        unsigned char key[16] = {0};
+        sm4_set_encrypt_key(&ctx, key);
+        return 0;
+      }''', dependencies: nettle)
+      crypto_sm4 = not_found
     endif
   endif
 endif
@@ -2249,6 +2292,7 @@ config_host_data.set('CONFIG_GNUTLS_CRYPTO', gnutls_crypto.found())
 config_host_data.set('CONFIG_TASN1', tasn1.found())
 config_host_data.set('CONFIG_GCRYPT', gcrypt.found())
 config_host_data.set('CONFIG_NETTLE', nettle.found())
+config_host_data.set('CONFIG_CRYPTO_SM4', crypto_sm4.found())
 config_host_data.set('CONFIG_HOGWEED', hogweed.found())
 config_host_data.set('CONFIG_QEMU_PRIVATE_XTS', xts == 'private')
 config_host_data.set('CONFIG_MALLOC_TRIM', has_malloc_trim)
@@ -2368,6 +2412,22 @@ else
 endif
 config_host_data.set('CONFIG_ASAN_IFACE_FIBER', have_asan_fiber)
 
+have_inotify_init = cc.has_header_symbol('sys/inotify.h', 'inotify_init')
+have_inotify_init1 = cc.has_header_symbol('sys/inotify.h', 'inotify_init1')
+inotify = not_found
+if (have_inotify_init or have_inotify_init1) and host_os == 'freebsd'
+  # libinotify-kqueue
+  inotify = cc.find_library('inotify')
+  if have_inotify_init
+    have_inotify_init = inotify.found()
+  endif
+  if have_inotify_init1
+    have_inotify_init1 = inotify.found()
+  endif
+endif
+config_host_data.set('CONFIG_INOTIFY', have_inotify_init)
+config_host_data.set('CONFIG_INOTIFY1', have_inotify_init1)
+
 # has_header_symbol
 config_host_data.set('CONFIG_BLKZONED',
                      cc.has_header_symbol('linux/blkzoned.h', 'BLKOPENZONE'))
@@ -2384,10 +2444,6 @@ config_host_data.set('CONFIG_FIEMAP',
 config_host_data.set('CONFIG_GETRANDOM',
                      cc.has_function('getrandom') and
                      cc.has_header_symbol('sys/random.h', 'GRND_NONBLOCK'))
-config_host_data.set('CONFIG_INOTIFY',
-                     cc.has_header_symbol('sys/inotify.h', 'inotify_init'))
-config_host_data.set('CONFIG_INOTIFY1',
-                     cc.has_header_symbol('sys/inotify.h', 'inotify_init1'))
 config_host_data.set('CONFIG_PRCTL_PR_SET_TIMERSLACK',
                      cc.has_header_symbol('sys/prctl.h', 'PR_SET_TIMERSLACK'))
 config_host_data.set('CONFIG_RTNETLINK',
@@ -3271,10 +3327,10 @@ if have_system
     'hw/arm',
     'hw/audio',
     'hw/block',
-    'hw/block/dataplane',
     'hw/char',
     'hw/display',
     'hw/dma',
+    'hw/fsi',
     'hw/hyperv',
     'hw/i2c',
     'hw/i386',
@@ -4277,6 +4333,7 @@ summary_info += {'nettle':            nettle}
 if nettle.found()
    summary_info += {'  XTS':             xts != 'private'}
 endif
+summary_info += {'SM4 ALG support':   crypto_sm4}
 summary_info += {'AF_ALG support':    have_afalg}
 summary_info += {'rng-none':          get_option('rng_none')}
 summary_info += {'Linux keyring':     have_keyring}
@@ -4392,6 +4449,9 @@ summary_info += {'libudev':           libudev}
 summary_info += {'FUSE lseek':        fuse_lseek.found()}
 summary_info += {'selinux':           selinux}
 summary_info += {'libdw':             libdw}
+if host_os == 'freebsd'
+  summary_info += {'libinotify-kqueue': inotify}
+endif
 summary(summary_info, bool_yn: true, section: 'Dependencies')
 
 if host_arch == 'unknown'

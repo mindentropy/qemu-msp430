@@ -2822,13 +2822,20 @@ static bool msr_banked_access_decode(DisasContext *s, int r, int sysm, int rn,
         break;
     case ARM_CPU_MODE_HYP:
         /*
-         * SPSR_hyp and r13_hyp can only be accessed from Monitor mode
-         * (and so we can forbid accesses from EL2 or below). elr_hyp
-         * can be accessed also from Hyp mode, so forbid accesses from
-         * EL0 or EL1.
+         * r13_hyp can only be accessed from Monitor mode, and so we
+         * can forbid accesses from EL2 or below.
+         * elr_hyp can be accessed also from Hyp mode, so forbid
+         * accesses from EL0 or EL1.
+         * SPSR_hyp is supposed to be in the same category as r13_hyp
+         * and UNPREDICTABLE if accessed from anything except Monitor
+         * mode. However there is some real-world code that will do
+         * it because at least some hardware happens to permit the
+         * access. (Notably a standard Cortex-R52 startup code fragment
+         * does this.) So we permit SPSR_hyp from Hyp mode also, to allow
+         * this (incorrect) guest code to run.
          */
-        if (!arm_dc_feature(s, ARM_FEATURE_EL2) || s->current_el < 2 ||
-            (s->current_el < 3 && *regno != 17)) {
+        if (!arm_dc_feature(s, ARM_FEATURE_EL2) || s->current_el < 2
+            || (s->current_el < 3 && *regno != 16 && *regno != 17)) {
             goto undef;
         }
         break;
@@ -9691,7 +9698,7 @@ static const TranslatorOps thumb_translator_ops = {
 
 /* generate intermediate code for basic block 'tb'.  */
 void gen_intermediate_code(CPUState *cpu, TranslationBlock *tb, int *max_insns,
-                           target_ulong pc, void *host_pc)
+                           vaddr pc, void *host_pc)
 {
     DisasContext dc = { };
     const TranslatorOps *ops = &arm_translator_ops;

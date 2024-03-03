@@ -118,6 +118,14 @@ static void subsystem_reset(void)
     DeviceState *dev;
     int i;
 
+    /*
+     * ISM firmware is sensitive to unexpected changes to the IOMMU, which can
+     * occur during reset of the vfio-pci device (unmap of entire aperture).
+     * Ensure any passthrough ISM devices are reset now, while CPUs are paused
+     * but before vfio-pci cleanup occurs.
+     */
+    s390_pci_ism_reset();
+
     for (i = 0; i < ARRAY_SIZE(reset_dev_types); i++) {
         dev = DEVICE(object_resolve_path_type("", reset_dev_types[i], NULL));
         if (dev) {
@@ -221,16 +229,9 @@ static void s390_init_ipl_dev(const char *kernel_filename,
 
 static void s390_create_virtio_net(BusState *bus, const char *name)
 {
-    int i;
+    DeviceState *dev;
 
-    for (i = 0; i < nb_nics; i++) {
-        NICInfo *nd = &nd_table[i];
-        DeviceState *dev;
-
-        qemu_check_nic_model(nd, "virtio");
-
-        dev = qdev_new(name);
-        qdev_set_nic_properties(dev, nd);
+    while ((dev = qemu_create_nic_device(name, true, "virtio"))) {
         qdev_realize_and_unref(dev, bus, &error_fatal);
     }
 }

@@ -41,6 +41,10 @@ over any transport.
 - exec migration: do the migration using the stdin/stdout through a process.
 - fd migration: do the migration using a file descriptor that is
   passed to QEMU.  QEMU doesn't care how this file descriptor is opened.
+- file migration: do the migration using a file that is passed to QEMU
+  by path. A file offset option is supported to allow a management
+  application to add its own metadata to the start of the file without
+  QEMU interference.
 
 In addition, support is included for migration using RDMA, which
 transports the page data using ``RDMA``, where the hardware takes care of
@@ -431,10 +435,10 @@ data doesn't match the stored device data well; it allows an
 intermediate temporary structure to be populated with migration
 data and then transferred to the main structure.
 
-If you use memory API functions that update memory layout outside
+If you use memory or portio_list API functions that update memory layout outside
 initialization (i.e., in response to a guest action), this is a strong
 indication that you need to call these functions in a ``post_load`` callback.
-Examples of such memory API functions are:
+Examples of such API functions are:
 
   - memory_region_add_subregion()
   - memory_region_del_subregion()
@@ -443,6 +447,8 @@ Examples of such memory API functions are:
   - memory_region_set_enabled()
   - memory_region_set_address()
   - memory_region_set_alias_offset()
+  - portio_list_set_address()
+  - portio_list_set_enabled()
 
 Iterative device migration
 --------------------------

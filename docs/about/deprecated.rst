@@ -63,45 +63,6 @@ as short-form boolean values, and passed to plugins as ``arg_name=on``.
 However, short-form booleans are deprecated and full explicit ``arg_name=on``
 form is preferred.
 
-``-no-hpet`` (since 8.0)
-''''''''''''''''''''''''
-
-The HPET setting has been turned into a machine property.
-Use ``-machine hpet=off`` instead.
-
-``-no-acpi`` (since 8.0)
-''''''''''''''''''''''''
-
-The ``-no-acpi`` setting has been turned into a machine property.
-Use ``-machine acpi=off`` instead.
-
-``-async-teardown`` (since 8.1)
-'''''''''''''''''''''''''''''''
-
-Use ``-run-with async-teardown=on`` instead.
-
-``-chroot`` (since 8.1)
-'''''''''''''''''''''''
-
-Use ``-run-with chroot=dir`` instead.
-
-``-singlestep`` (since 8.1)
-'''''''''''''''''''''''''''
-
-The ``-singlestep`` option has been turned into an accelerator property,
-and given a name that better reflects what it actually does.
-Use ``-accel tcg,one-insn-per-tb=on`` instead.
-
-User-mode emulator command line arguments
------------------------------------------
-
-``-singlestep`` (since 8.1)
-'''''''''''''''''''''''''''
-
-The ``-singlestep`` option has been given a name that better reflects
-what it actually does. For both linux-user and bsd-user, use the
-new ``-one-insn-per-tb`` option instead.
-
 QEMU Machine Protocol (QMP) commands
 ------------------------------------
 
@@ -173,20 +134,6 @@ accepted incorrect commands will return an error. Users should make sure that
 all arguments passed to ``device_add`` are consistent with the documented
 property types.
 
-``StatusInfo`` member ``singlestep`` (since 8.1)
-''''''''''''''''''''''''''''''''''''''''''''''''
-
-The ``singlestep`` member of the ``StatusInfo`` returned from the
-``query-status`` command is deprecated. This member has a confusing
-name and it never did what the documentation claimed or what its name
-suggests. We do not believe that anybody is actually using the
-information provided in this member.
-
-The information it reports is whether the TCG JIT is in "one
-instruction per translated block" mode (which can be set on the
-command line or via the HMP, but not via QMP). The information remains
-available via the HMP 'info jit' command.
-
 QEMU Machine Protocol (QMP) events
 ----------------------------------
 
@@ -202,15 +149,6 @@ The ability to instrument QEMU helper functions with vCPU-aware trace
 points was removed in 7.0. However QMP still exposed the vcpu
 parameter. This argument has now been deprecated and the remaining
 remaining trace points that used it are selected just by name.
-
-Human Monitor Protocol (HMP) commands
--------------------------------------
-
-``singlestep`` (since 8.1)
-''''''''''''''''''''''''''
-
-The ``singlestep`` command has been replaced by the ``one-insn-per-tb``
-command, which has the same behaviour but a less misleading name.
 
 Host Architectures
 ------------------
@@ -245,6 +183,22 @@ Nios II CPU (since 8.2)
 The Nios II architecture is orphan. The ``nios2`` guest CPU support is
 deprecated and will be removed in a future version of QEMU.
 
+``power5+`` and ``power7+`` CPU names (since 9.0)
+'''''''''''''''''''''''''''''''''''''''''''''''''
+
+The character "+" in device (and thus also CPU) names is not allowed
+in the QEMU object model anymore. ``power5+``, ``power5+_v2.1``,
+``power7+`` and ``power7+_v2.1`` are currently still supported via
+an alias, but for consistency these will get removed in a future
+release, too. Use ``power5p_v2.1`` and ``power7p_v2.1`` instead.
+
+CRIS CPU architecture (since 9.0)
+'''''''''''''''''''''''''''''''''
+
+The CRIS architecture was pulled from Linux in 4.17 and the compiler
+is no longer packaged in any distro making it harder to run the
+``check-tcg`` tests. Unless we can improve the testing situation there
+is a chance the code will bitrot without anyone noticing.
 
 System emulator machines
 ------------------------
@@ -269,6 +223,19 @@ Nios II ``10m50-ghrd`` and ``nios2-generic-nommu`` machines (since 8.2)
 
 The Nios II architecture is orphan.
 
+``shix`` (since 9.0)
+''''''''''''''''''''
+
+The machine is no longer in existence and has been long unmaintained
+in QEMU. This also holds for the TC51828 16MiB flash that it uses.
+
+``pseries-2.1`` up to ``pseries-2.11`` (since 9.0)
+''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Older pseries machines before version 2.12 have undergone many changes
+to correct issues, mostly regarding migration compatibility. These are
+no longer maintained and removing them will make the code easier to
+read and maintain. Use versions 2.12 and above as a replacement.
 
 Backend options
 ---------------
@@ -427,6 +394,14 @@ Specifying the iSCSI password in plain text on the command line using the
 ``password`` option is insecure. The ``password-secret`` option should be
 used instead, to refer to a ``--object secret...`` instance that provides
 a password via a file, or encrypted.
+
+Character device options
+''''''''''''''''''''''''
+
+Backend ``memory`` (since 9.0)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``memory`` is a deprecated synonym for ``ringbuf``.
 
 CPU device properties
 '''''''''''''''''''''

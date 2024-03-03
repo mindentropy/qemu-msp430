@@ -1,3 +1,5 @@
+HXCOMM See docs/devel/docs.rst for the format of this file.
+HXCOMM
 HXCOMM Use DEFHEADING() to define headings in both help text and rST.
 HXCOMM Text between SRST and ERST is copied to the rST version and
 HXCOMM discarded from C version.
@@ -188,7 +190,8 @@ DEF("accel", HAS_ARG, QEMU_OPTION_accel,
     "                dirty-ring-size=n (KVM dirty ring GFN count, default 0)\n"
     "                eager-split-size=n (KVM Eager Page Split chunk size, default 0, disabled. ARM only)\n"
     "                notify-vmexit=run|internal-error|disable,notify-window=n (enable notify VM exit and set notify window, x86 only)\n"
-    "                thread=single|multi (enable multi-threaded TCG)\n", QEMU_ARCH_ALL)
+    "                thread=single|multi (enable multi-threaded TCG)\n"
+    "                device=path (KVM device path, default /dev/kvm)\n", QEMU_ARCH_ALL)
 SRST
 ``-accel name[,prop=value[,...]]``
     This is used to enable an accelerator. Depending on the target
@@ -268,6 +271,11 @@ SRST
         This feature can mitigate the CPU stuck issue due to event windows don't
         open up for a specified of time (i.e. notify-window).
         Default: notify-vmexit=run,notify-window=0.
+
+    ``device=path``
+        Sets the path to the KVM device node. Defaults to ``/dev/kvm``. This
+        option can be used to pass the KVM device to use via a file descriptor
+        by setting the value to ``/dev/fdset/NN``.
 
 ERST
 
@@ -2077,7 +2085,7 @@ DEF("display", HAS_ARG, QEMU_OPTION_display,
 #if defined(CONFIG_GTK)
     "-display gtk[,full-screen=on|off][,gl=on|off][,grab-on-hover=on|off]\n"
     "            [,show-tabs=on|off][,show-cursor=on|off][,window-close=on|off]\n"
-    "            [,show-menubar=on|off]\n"
+    "            [,show-menubar=on|off][,zoom-to-fit=on|off]\n"
 #endif
 #if defined(CONFIG_VNC)
     "-display vnc=<display>[,<optargs>]\n"
@@ -2460,7 +2468,7 @@ SRST
 
     ``to=L``
         With this option, QEMU will try next available VNC displays,
-        until the number L, if the origianlly defined "-vnc display" is
+        until the number L, if the originally defined "-vnc display" is
         not available, e.g. port 5900+display is already used by another
         application. By default, to=0.
 
@@ -2633,7 +2641,8 @@ SRST
 ``-win2k-hack``
     Use it when installing Windows 2000 to avoid a disk full bug. After
     Windows 2000 is installed, you no longer need this option (this
-    option slows down the IDE transfers).
+    option slows down the IDE transfers).  Synonym of ``-global
+    ide-device.win2k-install-hack=on``.
 ERST
 
 DEF("no-fd-bootchk", 0, QEMU_OPTION_no_fd_bootchk,
@@ -2642,23 +2651,7 @@ DEF("no-fd-bootchk", 0, QEMU_OPTION_no_fd_bootchk,
 SRST
 ``-no-fd-bootchk``
     Disable boot signature checking for floppy disks in BIOS. May be
-    needed to boot from old floppy disks.
-ERST
-
-DEF("no-acpi", 0, QEMU_OPTION_no_acpi,
-           "-no-acpi        disable ACPI\n", QEMU_ARCH_I386 | QEMU_ARCH_ARM)
-SRST
-``-no-acpi``
-    Disable ACPI (Advanced Configuration and Power Interface) support.
-    Use it if your guest OS complains about ACPI problems (PC target
-    machine only).
-ERST
-
-DEF("no-hpet", 0, QEMU_OPTION_no_hpet,
-    "-no-hpet        disable HPET\n", QEMU_ARCH_I386)
-SRST
-``-no-hpet``
-    Disable HPET support. Deprecated, use '-machine hpet=off' instead.
+    needed to boot from old floppy disks.  Synonym of ``-m fd-bootchk=off``.
 ERST
 
 DEF("acpitable", HAS_ARG, QEMU_OPTION_acpitable,
@@ -2694,7 +2687,7 @@ DEF("smbios", HAS_ARG, QEMU_OPTION_smbios,
     "                specify SMBIOS type 3 fields\n"
     "-smbios type=4[,sock_pfx=str][,manufacturer=str][,version=str][,serial=str]\n"
     "              [,asset=str][,part=str][,max-speed=%d][,current-speed=%d]\n"
-    "              [,processor-id=%d]\n"
+    "              [,processor-family=%d,processor-id=%d]\n"
     "                specify SMBIOS type 4 fields\n"
     "-smbios type=8[,external_reference=str][,internal_reference=str][,connector_type=%d][,port_type=%d]\n"
     "                specify SMBIOS type 8 fields\n"
@@ -2705,7 +2698,7 @@ DEF("smbios", HAS_ARG, QEMU_OPTION_smbios,
     "                specify SMBIOS type 17 fields\n"
     "-smbios type=41[,designation=str][,kind=str][,instance=%d][,pcidev=str]\n"
     "                specify SMBIOS type 41 fields\n",
-    QEMU_ARCH_I386 | QEMU_ARCH_ARM | QEMU_ARCH_LOONGARCH)
+    QEMU_ARCH_I386 | QEMU_ARCH_ARM | QEMU_ARCH_LOONGARCH | QEMU_ARCH_RISCV)
 SRST
 ``-smbios file=binary``
     Load SMBIOS entry from binary file.
@@ -2722,7 +2715,7 @@ SRST
 ``-smbios type=3[,manufacturer=str][,version=str][,serial=str][,asset=str][,sku=str]``
     Specify SMBIOS type 3 fields
 
-``-smbios type=4[,sock_pfx=str][,manufacturer=str][,version=str][,serial=str][,asset=str][,part=str][,processor-id=%d]``
+``-smbios type=4[,sock_pfx=str][,manufacturer=str][,version=str][,serial=str][,asset=str][,part=str][,processor-family=%d][,processor-id=%d]``
     Specify SMBIOS type 4 fields
 
 ``-smbios type=11[,value=str][,path=filename]``
@@ -3108,6 +3101,8 @@ SRST
         server. The files in dir will be exposed as the root of a TFTP
         server. The TFTP client on the guest must be configured in
         binary mode (use the command ``bin`` of the Unix TFTP client).
+        The built-in TFTP server is read-only; it does not implement any
+        command for writing files. QEMU will not write to this directory.
 
     ``tftp-server-name=name``
         In BOOTP reply, broadcast name as the "TFTP server name"
@@ -4002,7 +3997,7 @@ ERST
 
 DEF("initrd", HAS_ARG, QEMU_OPTION_initrd, \
            "-initrd file    use 'file' as initial ram disk\n", QEMU_ARCH_ALL)
-SRST
+SRST(initrd)
 
 ``-initrd file``
     Use file as initial ram disk.
@@ -4137,7 +4132,8 @@ SRST
     This option can be used several times to simulate up to 4 serial
     ports.
 
-    Use ``-serial none`` to disable all serial ports.
+    You can use ``-serial none`` to suppress the creation of default
+    serial devices.
 
     Available character devices are:
 
@@ -4159,10 +4155,17 @@ SRST
         [Linux only] Pseudo TTY (a new PTY is automatically allocated)
 
     ``none``
-        No device is allocated.
+        No device is allocated. Note that for machine types which
+        emulate systems where a serial device is always present in
+        real hardware, this may be equivalent to the ``null`` option,
+        in that the serial device is still present but all output
+        is discarded. For boards where the number of serial ports is
+        truly variable, this suppresses the creation of the device.
 
     ``null``
-        void device
+        A guest will see the UART or serial device as present in the
+        machine, but all output is discarded, and there is no input.
+        Conceptually equivalent to redirecting the output to ``/dev/null``.
 
     ``chardev:id``
         Use a named character device defined with the ``-chardev``
@@ -4371,14 +4374,6 @@ SRST
 ``-pidfile file``
     Store the QEMU process PID in file. It is useful if you launch QEMU
     from a script.
-ERST
-
-DEF("singlestep", 0, QEMU_OPTION_singlestep, \
-    "-singlestep     deprecated synonym for -accel tcg,one-insn-per-tb=on\n", QEMU_ARCH_ALL)
-SRST
-``-singlestep``
-    This is a deprecated synonym for the TCG accelerator property
-    ``one-insn-per-tb``.
 ERST
 
 DEF("preconfig", 0, QEMU_OPTION_preconfig, \
@@ -4807,18 +4802,6 @@ SRST
 ERST
 
 #ifndef _WIN32
-DEF("chroot", HAS_ARG, QEMU_OPTION_chroot, \
-    "-chroot dir     chroot to dir just before starting the VM (deprecated)\n",
-    QEMU_ARCH_ALL)
-#endif
-SRST
-``-chroot dir``
-    Deprecated, use '-run-with chroot=...' instead.
-    Immediately before starting guest execution, chroot to the specified
-    directory. Especially useful in combination with -runas.
-ERST
-
-#ifndef _WIN32
 DEF("runas", HAS_ARG, QEMU_OPTION_runas, \
     "-runas user     change to user id user just before starting the VM\n" \
     "                user can be numeric uid:gid instead\n",
@@ -4991,16 +4974,6 @@ HXCOMM Internal use
 DEF("qtest", HAS_ARG, QEMU_OPTION_qtest, "", QEMU_ARCH_ALL)
 DEF("qtest-log", HAS_ARG, QEMU_OPTION_qtest_log, "", QEMU_ARCH_ALL)
 
-#ifdef __linux__
-DEF("async-teardown", 0, QEMU_OPTION_asyncteardown,
-    "-async-teardown enable asynchronous teardown\n",
-    QEMU_ARCH_ALL)
-SRST
-``-async-teardown``
-    This option is deprecated and should no longer be used. The new option
-    ``-run-with async-teardown=on`` is a replacement.
-ERST
-#endif
 #ifdef CONFIG_POSIX
 DEF("run-with", HAS_ARG, QEMU_OPTION_run_with,
     "-run-with [async-teardown=on|off][,chroot=dir]\n"
@@ -5500,7 +5473,7 @@ SRST
             KVM COLO
 
             primary:
-            -netdev tap,id=hn0,vhost=off,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown
+            -netdev tap,id=hn0,vhost=off
             -device e1000,id=e0,netdev=hn0,mac=52:a4:00:12:78:66
             -chardev socket,id=mirror0,host=3.3.3.3,port=9003,server=on,wait=off
             -chardev socket,id=compare1,host=3.3.3.3,port=9004,server=on,wait=off
@@ -5515,7 +5488,7 @@ SRST
             -object colo-compare,id=comp0,primary_in=compare0-0,secondary_in=compare1,outdev=compare_out0,iothread=iothread1
 
             secondary:
-            -netdev tap,id=hn0,vhost=off,script=/etc/qemu-ifup,down script=/etc/qemu-ifdown
+            -netdev tap,id=hn0,vhost=off
             -device e1000,netdev=hn0,mac=52:a4:00:12:78:66
             -chardev socket,id=red0,host=3.3.3.3,port=9003
             -chardev socket,id=red1,host=3.3.3.3,port=9004
@@ -5526,7 +5499,7 @@ SRST
             Xen COLO
 
             primary:
-            -netdev tap,id=hn0,vhost=off,script=/etc/qemu-ifup,downscript=/etc/qemu-ifdown
+            -netdev tap,id=hn0,vhost=off
             -device e1000,id=e0,netdev=hn0,mac=52:a4:00:12:78:66
             -chardev socket,id=mirror0,host=3.3.3.3,port=9003,server=on,wait=off
             -chardev socket,id=compare1,host=3.3.3.3,port=9004,server=on,wait=off
@@ -5539,10 +5512,10 @@ SRST
             -object filter-redirector,netdev=hn0,id=redire0,queue=rx,indev=compare_out
             -object filter-redirector,netdev=hn0,id=redire1,queue=rx,outdev=compare0
             -object iothread,id=iothread1
-            -object colo-compare,id=comp0,primary_in=compare0-0,secondary_in=compare1,outdev=compare_out0,notify_dev=nofity_way,iothread=iothread1
+            -object colo-compare,id=comp0,primary_in=compare0-0,secondary_in=compare1,outdev=compare_out0,notify_dev=notify_way,iothread=iothread1
 
             secondary:
-            -netdev tap,id=hn0,vhost=off,script=/etc/qemu-ifup,down script=/etc/qemu-ifdown
+            -netdev tap,id=hn0,vhost=off
             -device e1000,netdev=hn0,mac=52:a4:00:12:78:66
             -chardev socket,id=red0,host=3.3.3.3,port=9003
             -chardev socket,id=red1,host=3.3.3.3,port=9004

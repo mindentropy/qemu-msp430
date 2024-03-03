@@ -148,9 +148,9 @@ Vring descriptor indices for packed virtqueues
 A vring address description
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-+-------+-------+------+------------+------+-----------+-----+
-| index | flags | size | descriptor | used | available | log |
-+-------+-------+------+------------+------+-----------+-----+
++-------+-------+------------+------+-----------+-----+
+| index | flags | descriptor | used | available | log |
++-------+-------+------------+------+-----------+-----+
 
 :index: a 32-bit vring index
 
@@ -989,7 +989,7 @@ When reconnecting:
 
    #. If ``d.flags`` is not equal to the calculated flags value (means
       back-end has submitted the buffer to guest driver before crash, so
-      it has to commit the in-progres update), set ``old_free_head``,
+      it has to commit the in-progress update), set ``old_free_head``,
       ``old_used_idx``, ``old_used_wrap_counter`` to ``free_head``,
       ``used_idx``, ``used_wrap_counter``
 

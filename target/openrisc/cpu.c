@@ -68,6 +68,18 @@ static bool openrisc_cpu_has_work(CPUState *cs)
                                     CPU_INTERRUPT_TIMER);
 }
 
+static int openrisc_cpu_mmu_index(CPUState *cs, bool ifetch)
+{
+    CPUOpenRISCState *env = cpu_env(cs);
+
+    if (env->sr & (ifetch ? SR_IME : SR_DME)) {
+        /* The mmu is enabled; test supervisor state.  */
+        return env->sr & SR_SM ? MMU_SUPERVISOR_IDX : MMU_USER_IDX;
+    }
+
+    return MMU_NOMMU_IDX;  /* mmu is disabled */
+}
+
 static void openrisc_disas_set_info(CPUState *cpu, disassemble_info *info)
 {
     info->print_insn = print_insn_or1k;
@@ -213,7 +225,7 @@ static const struct SysemuCPUOps openrisc_sysemu_ops = {
 
 #include "hw/core/tcg-cpu-ops.h"
 
-static const struct TCGCPUOps openrisc_tcg_ops = {
+static const TCGCPUOps openrisc_tcg_ops = {
     .initialize = openrisc_translate_init,
     .synchronize_from_tb = openrisc_cpu_synchronize_from_tb,
     .restore_state_to_opc = openrisc_restore_state_to_opc,
@@ -239,6 +251,7 @@ static void openrisc_cpu_class_init(ObjectClass *oc, void *data)
 
     cc->class_by_name = openrisc_cpu_class_by_name;
     cc->has_work = openrisc_cpu_has_work;
+    cc->mmu_index = openrisc_cpu_mmu_index;
     cc->dump_state = openrisc_cpu_dump_state;
     cc->set_pc = openrisc_cpu_set_pc;
     cc->get_pc = openrisc_cpu_get_pc;

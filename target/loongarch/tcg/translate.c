@@ -125,7 +125,7 @@ static void loongarch_tr_init_disas_context(DisasContextBase *dcbase,
     if (ctx->base.tb->flags & HW_FLAGS_CRMD_PG) {
         ctx->mem_idx = ctx->plv;
     } else {
-        ctx->mem_idx = MMU_IDX_DA;
+        ctx->mem_idx = MMU_DA_IDX;
     }
 
     /* Bound the number of insns to execute to those left on the page.  */
@@ -343,7 +343,7 @@ static const TranslatorOps loongarch_tr_ops = {
 };
 
 void gen_intermediate_code(CPUState *cs, TranslationBlock *tb, int *max_insns,
-                           target_ulong pc, void *host_pc)
+                           vaddr pc, void *host_pc)
 {
     DisasContext ctx;
 

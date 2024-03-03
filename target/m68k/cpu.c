@@ -56,6 +56,11 @@ static bool m68k_cpu_has_work(CPUState *cs)
     return cs->interrupt_request & CPU_INTERRUPT_HARD;
 }
 
+static int m68k_cpu_mmu_index(CPUState *cs, bool ifetch)
+{
+    return cpu_env(cs)->sr & SR_S ? MMU_KERNEL_IDX : MMU_USER_IDX;
+}
+
 static void m68k_set_feature(CPUM68KState *env, int feature)
 {
     env->features |= BIT_ULL(feature);
@@ -137,7 +142,8 @@ static void m68000_cpu_initfn(Object *obj)
 }
 
 /*
- * Adds BKPT, MOVE-from-SR *now priv instr, and MOVEC, MOVES, RTD
+ * Adds BKPT, MOVE-from-SR *now priv instr, and MOVEC, MOVES, RTD,
+ *      format+vector in exception frame.
  */
 static void m68010_cpu_initfn(Object *obj)
 {
@@ -150,6 +156,7 @@ static void m68010_cpu_initfn(Object *obj)
     m68k_set_feature(env, M68K_FEATURE_BKPT);
     m68k_set_feature(env, M68K_FEATURE_MOVEC);
     m68k_set_feature(env, M68K_FEATURE_MOVEFROMSR_PRIV);
+    m68k_set_feature(env, M68K_FEATURE_EXCEPTION_FORMAT_VEC);
 }
 
 /*
@@ -525,7 +532,7 @@ static const struct SysemuCPUOps m68k_sysemu_ops = {
 
 #include "hw/core/tcg-cpu-ops.h"
 
-static const struct TCGCPUOps m68k_tcg_ops = {
+static const TCGCPUOps m68k_tcg_ops = {
     .initialize = m68k_tcg_init,
     .restore_state_to_opc = m68k_restore_state_to_opc,
 
@@ -551,6 +558,7 @@ static void m68k_cpu_class_init(ObjectClass *c, void *data)
 
     cc->class_by_name = m68k_cpu_class_by_name;
     cc->has_work = m68k_cpu_has_work;
+    cc->mmu_index = m68k_cpu_mmu_index;
     cc->dump_state = m68k_cpu_dump_state;
     cc->set_pc = m68k_cpu_set_pc;
     cc->get_pc = m68k_cpu_get_pc;
@@ -562,7 +570,6 @@ static void m68k_cpu_class_init(ObjectClass *c, void *data)
 #endif
     cc->disas_set_info = m68k_cpu_disas_set_info;
 
-    cc->gdb_num_core_regs = 18;
     cc->tcg_ops = &m68k_tcg_ops;
 }
 

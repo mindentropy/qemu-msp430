@@ -30,6 +30,7 @@
 #include "semihosting/common-semi.h"
 #endif
 #include "cpregs.h"
+#include "target/arm/gtimer.h"
 
 #define ARM_CPU_FREQ 1000000000 /* FIXME: 1 GHz, should be configurable */
 
@@ -948,16 +949,19 @@ static int64_t cycles_ns_per(uint64_t cycles)
 
 static bool instructions_supported(CPUARMState *env)
 {
-    return icount_enabled() == 1; /* Precise instruction counting */
+    /* Precise instruction counting */
+    return icount_enabled() == ICOUNT_PRECISE;
 }
 
 static uint64_t instructions_get_count(CPUARMState *env)
 {
+    assert(icount_enabled() == ICOUNT_PRECISE);
     return (uint64_t)icount_get_raw();
 }
 
 static int64_t instructions_ns_per(uint64_t icount)
 {
+    assert(icount_enabled() == ICOUNT_PRECISE);
     return icount_to_ns((int64_t)icount);
 }
 #endif
@@ -1183,12 +1187,20 @@ static bool pmu_counter_enabled(CPUARMState *env, uint8_t counter)
     bool enabled, prohibited = false, filtered;
     bool secure = arm_is_secure(env);
     int el = arm_current_el(env);
-    uint64_t mdcr_el2 = arm_mdcr_el2_eff(env);
-    uint8_t hpmn = mdcr_el2 & MDCR_HPMN;
+    uint64_t mdcr_el2;
+    uint8_t hpmn;
 
+    /*
+     * We might be called for M-profile cores where MDCR_EL2 doesn't
+     * exist and arm_mdcr_el2_eff() will assert, so this early-exit check
+     * must be before we read that value.
+     */
     if (!arm_feature(env, ARM_FEATURE_PMU)) {
         return false;
     }
+
+    mdcr_el2 = arm_mdcr_el2_eff(env);
+    hpmn = mdcr_el2 & MDCR_HPMN;
 
     if (!arm_feature(env, ARM_FEATURE_EL2) ||
             (counter < hpmn || counter == 31)) {
@@ -3341,20 +3353,6 @@ static const ARMCPRegInfo generic_timer_cp_reginfo[] = {
       .writefn = gt_sec_cval_write, .raw_writefn = raw_write,
     },
 };
-
-static CPAccessResult e2h_access(CPUARMState *env, const ARMCPRegInfo *ri,
-                                 bool isread)
-{
-    if (arm_current_el(env) == 1) {
-        /* This must be a FEAT_NV access */
-        /* TODO: FEAT_ECV will need to check CNTHCTL_EL2 here */
-        return CP_ACCESS_OK;
-    }
-    if (!(arm_hcr_el2_eff(env) & HCR_E2H)) {
-        return CP_ACCESS_TRAP;
-    }
-    return CP_ACCESS_OK;
-}
 
 #else
 
@@ -6543,6 +6541,21 @@ static const ARMCPRegInfo el3_cp_reginfo[] = {
 };
 
 #ifndef CONFIG_USER_ONLY
+
+static CPAccessResult e2h_access(CPUARMState *env, const ARMCPRegInfo *ri,
+                                 bool isread)
+{
+    if (arm_current_el(env) == 1) {
+        /* This must be a FEAT_NV access */
+        /* TODO: FEAT_ECV will need to check CNTHCTL_EL2 here */
+        return CP_ACCESS_OK;
+    }
+    if (!(arm_hcr_el2_eff(env) & HCR_E2H)) {
+        return CP_ACCESS_TRAP;
+    }
+    return CP_ACCESS_OK;
+}
+
 /* Test if system register redirection is to occur in the current state.  */
 static bool redirect_for_e2h(CPUARMState *env)
 {
@@ -7836,7 +7849,7 @@ static void dccvap_writefn(CPUARMState *env, const ARMCPRegInfo *opaque,
     uint64_t vaddr_in = (uint64_t) value;
     uint64_t vaddr = vaddr_in & ~(dline_size - 1);
     void *haddr;
-    int mem_idx = cpu_mmu_index(env, false);
+    int mem_idx = arm_env_mmu_index(env);
 
     /* This won't be crossing page boundaries */
     haddr = probe_read(env, vaddr, dline_size, mem_idx, GETPC());
@@ -8892,6 +8905,7 @@ void register_cp_regs_for_features(ARMCPU *cpu)
                                R_ID_AA64ZFR0_AES_MASK |
                                R_ID_AA64ZFR0_BITPERM_MASK |
                                R_ID_AA64ZFR0_BFLOAT16_MASK |
+                               R_ID_AA64ZFR0_B16B16_MASK |
                                R_ID_AA64ZFR0_SHA3_MASK |
                                R_ID_AA64ZFR0_SM4_MASK |
                                R_ID_AA64ZFR0_I8MM_MASK |
@@ -9514,7 +9528,7 @@ void register_cp_regs_for_features(ARMCPU *cpu)
          * AArch64 cores we might need to add a specific feature flag
          * to indicate cores with "flavour 2" CBAR.
          */
-        if (arm_feature(env, ARM_FEATURE_AARCH64)) {
+        if (arm_feature(env, ARM_FEATURE_V8)) {
             /* 32 bit view is [31:18] 0...0 [43:32]. */
             uint32_t cbar32 = (extract64(cpu->reset_cbar, 18, 14) << 18)
                 | extract64(cpu->reset_cbar, 32, 12);
@@ -11010,6 +11024,24 @@ static void arm_cpu_do_interrupt_aarch32(CPUState *cs)
     }
 
     if (env->exception.target_el == 2) {
+        /* Debug exceptions are reported differently on AArch32 */
+        switch (syn_get_ec(env->exception.syndrome)) {
+        case EC_BREAKPOINT:
+        case EC_BREAKPOINT_SAME_EL:
+        case EC_AA32_BKPT:
+        case EC_VECTORCATCH:
+            env->exception.syndrome = syn_insn_abort(arm_current_el(env) == 2,
+                                                     0, 0, 0x22);
+            break;
+        case EC_WATCHPOINT:
+            env->exception.syndrome = syn_set_ec(env->exception.syndrome,
+                                                 EC_DATAABORT);
+            break;
+        case EC_WATCHPOINT_SAME_EL:
+            env->exception.syndrome = syn_set_ec(env->exception.syndrome,
+                                                 EC_DATAABORT_SAME_EL);
+            break;
+        }
         arm_cpu_do_interrupt_aarch32_hyp(cs);
         return;
     }

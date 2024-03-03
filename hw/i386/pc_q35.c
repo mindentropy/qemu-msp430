@@ -30,6 +30,7 @@
 
 #include "qemu/osdep.h"
 #include "qemu/units.h"
+#include "hw/acpi/acpi.h"
 #include "hw/char/parallel-isa.h"
 #include "hw/loader.h"
 #include "hw/i2c/smbus_eeprom.h"
@@ -45,9 +46,8 @@
 #include "hw/i386/amd_iommu.h"
 #include "hw/i386/intel_iommu.h"
 #include "hw/display/ramfb.h"
-#include "hw/firmware/smbios.h"
 #include "hw/ide/pci.h"
-#include "hw/ide/ahci.h"
+#include "hw/ide/ahci-pci.h"
 #include "hw/intc/ioapic.h"
 #include "hw/southbridge/ich9.h"
 #include "hw/usb.h"
@@ -123,25 +123,22 @@ static void pc_q35_init(MachineState *machine)
     PCMachineClass *pcmc = PC_MACHINE_GET_CLASS(pcms);
     X86MachineState *x86ms = X86_MACHINE(machine);
     Object *phb;
-    PCIBus *host_bus;
     PCIDevice *lpc;
     DeviceState *lpc_dev;
-    BusState *idebus[MAX_SATA_PORTS];
-    ISADevice *rtc_state;
     MemoryRegion *system_memory = get_system_memory();
     MemoryRegion *system_io = get_system_io();
-    MemoryRegion *pci_memory;
-    MemoryRegion *rom_memory;
+    MemoryRegion *pci_memory = g_new(MemoryRegion, 1);
     GSIState *gsi_state;
     ISABus *isa_bus;
     int i;
-    PCIDevice *ahci;
     ram_addr_t lowmem;
     DriveInfo *hd[MAX_SATA_PORTS];
     MachineClass *mc = MACHINE_GET_CLASS(machine);
     bool acpi_pcihp;
     bool keep_pci_slot_hpc;
     uint64_t pci_hole64_size = 0;
+
+    assert(pcmc->pci_enabled);
 
     /* Check whether RAM fits below 4G (leaving 1/2 GByte for IO memory
      * and 256 Mbytes for PCI Express Enhanced Configuration Access Mapping
@@ -189,37 +186,16 @@ static void pc_q35_init(MachineState *machine)
         kvmclock_create(pcmc->kvmclock_create_always);
     }
 
-    /* pci enabled */
-    if (pcmc->pci_enabled) {
-        pci_memory = g_new(MemoryRegion, 1);
-        memory_region_init(pci_memory, NULL, "pci", UINT64_MAX);
-        rom_memory = pci_memory;
-    } else {
-        pci_memory = NULL;
-        rom_memory = system_memory;
-    }
-
-    pc_guest_info_init(pcms);
-
-    if (pcmc->smbios_defaults) {
-        /* These values are guest ABI, do not change */
-        smbios_set_defaults("QEMU", mc->desc,
-                            mc->name, pcmc->smbios_legacy_mode,
-                            pcmc->smbios_uuid_encoded,
-                            pcms->smbios_entry_point_type);
-    }
-
     /* create pci host bus */
     phb = OBJECT(qdev_new(TYPE_Q35_HOST_DEVICE));
 
-    if (pcmc->pci_enabled) {
-        pci_hole64_size = object_property_get_uint(phb,
-                                                   PCI_HOST_PROP_PCI_HOLE64_SIZE,
-                                                   &error_abort);
-    }
+    pci_hole64_size = object_property_get_uint(phb,
+                                               PCI_HOST_PROP_PCI_HOLE64_SIZE,
+                                               &error_abort);
 
     /* allocate ram and load rom/bios */
-    pc_memory_init(pcms, system_memory, rom_memory, pci_hole64_size);
+    memory_region_init(pci_memory, NULL, "pci", UINT64_MAX);
+    pc_memory_init(pcms, system_memory, pci_memory, pci_hole64_size);
 
     object_property_add_child(OBJECT(machine), "q35", phb);
     object_property_set_link(phb, PCI_HOST_PROP_RAM_MEM,
@@ -239,24 +215,23 @@ static void pc_q35_init(MachineState *machine)
     sysbus_realize_and_unref(SYS_BUS_DEVICE(phb), &error_fatal);
 
     /* pci */
-    host_bus = PCI_BUS(qdev_get_child_bus(DEVICE(phb), "pcie.0"));
-    pcms->bus = host_bus;
+    pcms->pcibus = PCI_BUS(qdev_get_child_bus(DEVICE(phb), "pcie.0"));
 
     /* irq lines */
-    gsi_state = pc_gsi_create(&x86ms->gsi, pcmc->pci_enabled);
+    gsi_state = pc_gsi_create(&x86ms->gsi, true);
 
     /* create ISA bus */
     lpc = pci_new_multifunction(PCI_DEVFN(ICH9_LPC_DEV, ICH9_LPC_FUNC),
                                 TYPE_ICH9_LPC_DEVICE);
-    qdev_prop_set_bit(DEVICE(lpc), "smm-enabled",
-                      x86_machine_is_smm_enabled(x86ms));
     lpc_dev = DEVICE(lpc);
+    qdev_prop_set_bit(lpc_dev, "smm-enabled",
+                      x86_machine_is_smm_enabled(x86ms));
     for (i = 0; i < IOAPIC_NUM_PINS; i++) {
         qdev_connect_gpio_out_named(lpc_dev, ICH9_GPIO_GSI, i, x86ms->gsi[i]);
     }
-    pci_realize_and_unref(lpc, host_bus, &error_fatal);
+    pci_realize_and_unref(lpc, pcms->pcibus, &error_fatal);
 
-    rtc_state = ISA_DEVICE(object_resolve_path_component(OBJECT(lpc), "rtc"));
+    x86ms->rtc = ISA_DEVICE(object_resolve_path_component(OBJECT(lpc), "rtc"));
 
     object_property_add_link(OBJECT(machine), PC_MACHINE_ACPI_DEVICE_PROP,
                              TYPE_HOTPLUG_HANDLER,
@@ -286,9 +261,7 @@ static void pc_q35_init(MachineState *machine)
         pc_i8259_create(isa_bus, gsi_state->i8259_irq);
     }
 
-    if (pcmc->pci_enabled) {
-        ioapic_init_gsi(gsi_state, "q35");
-    }
+    ioapic_init_gsi(gsi_state, OBJECT(phb));
 
     if (tcg_enabled()) {
         x86_register_ferr_irq(x86ms->gsi[13]);
@@ -300,34 +273,36 @@ static void pc_q35_init(MachineState *machine)
     }
 
     /* init basic PC hardware */
-    pc_basic_device_init(pcms, isa_bus, x86ms->gsi, rtc_state, !mc->no_floppy,
+    pc_basic_device_init(pcms, isa_bus, x86ms->gsi, x86ms->rtc, !mc->no_floppy,
                          0xff0104);
 
     if (pcms->sata_enabled) {
+        PCIDevice *pdev;
+        AHCIPCIState *ich9;
+
         /* ahci and SATA device, for q35 1 ahci controller is built-in */
-        ahci = pci_create_simple_multifunction(host_bus,
+        pdev = pci_create_simple_multifunction(pcms->pcibus,
                                                PCI_DEVFN(ICH9_SATA1_DEV,
                                                          ICH9_SATA1_FUNC),
                                                "ich9-ahci");
-        idebus[0] = qdev_get_child_bus(&ahci->qdev, "ide.0");
-        idebus[1] = qdev_get_child_bus(&ahci->qdev, "ide.1");
-        g_assert(MAX_SATA_PORTS == ahci_get_num_ports(ahci));
-        ide_drive_get(hd, ahci_get_num_ports(ahci));
-        ahci_ide_create_devs(ahci, hd);
-    } else {
-        idebus[0] = idebus[1] = NULL;
+        ich9 = ICH9_AHCI(pdev);
+        pcms->idebus[0] = qdev_get_child_bus(DEVICE(pdev), "ide.0");
+        pcms->idebus[1] = qdev_get_child_bus(DEVICE(pdev), "ide.1");
+        g_assert(MAX_SATA_PORTS == ich9->ahci.ports);
+        ide_drive_get(hd, ich9->ahci.ports);
+        ahci_ide_create_devs(&ich9->ahci, hd);
     }
 
     if (machine_usb(machine)) {
         /* Should we create 6 UHCI according to ich9 spec? */
-        ehci_create_ich9_with_companions(host_bus, 0x1d);
+        ehci_create_ich9_with_companions(pcms->pcibus, 0x1d);
     }
 
     if (pcms->smbus_enabled) {
         PCIDevice *smb;
 
         /* TODO: Populate SPD eeprom data.  */
-        smb = pci_create_simple_multifunction(host_bus,
+        smb = pci_create_simple_multifunction(pcms->pcibus,
                                               PCI_DEVFN(ICH9_SMB_DEV,
                                                         ICH9_SMB_FUNC),
                                               TYPE_ICH9_SMB_DEVICE);
@@ -336,11 +311,11 @@ static void pc_q35_init(MachineState *machine)
         smbus_eeprom_init(pcms->smbus, 8, NULL, 0);
     }
 
-    pc_cmos_init(pcms, idebus[0], idebus[1], rtc_state);
+    pc_cmos_init(pcms, x86ms->rtc);
 
     /* the rest devices to which pci devfn is automatically assigned */
-    pc_vga_init(isa_bus, host_bus);
-    pc_nic_init(pcmc, isa_bus, host_bus, pcms->xenbus);
+    pc_vga_init(isa_bus, pcms->pcibus);
+    pc_nic_init(pcmc, isa_bus, pcms->pcibus);
 
     if (machine->nvdimms_state->is_enabled) {
         nvdimm_init_acpi_state(machine->nvdimms_state, system_io,
