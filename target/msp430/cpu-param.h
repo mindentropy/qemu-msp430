@@ -7,6 +7,6 @@
 
 #define TARGET_PHYS_ADDR_SPACE_BITS 32
 #define TARGET_VIRT_ADDR_SPACE_BITS 32
-#define NB_MMU_MODES 1
+/* For NB_MMU_MODES see cpu.h */
 
 #endif

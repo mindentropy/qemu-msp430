@@ -4,7 +4,7 @@
 #]
 
 msp430_ss = ss.source_set()
-msp430_softmmu_ss = ss.source_set()
+msp430_system_ss= ss.source_set()
 
 msp430_ss.add(files(
 	'translate.c',
@@ -13,4 +13,4 @@ msp430_ss.add(files(
 	'gdbstub.c'))
 
 target_arch += {'msp430': msp430_ss}
-target_softmmu_arch += {'msp430': msp430_softmmu_ss}
+target_system_arch += {'msp430': msp430_system_ss}

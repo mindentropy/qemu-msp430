@@ -32,7 +32,7 @@ static void msp430_load_kernel(CPUMSP430State *env, const char *filename)
 
 static void msp430_launchpad_init(MachineState *machine)
 {
-	struct MSP430CPU *cpu;
+	MSP430CPU *cpu;
 	CPUMSP430State *env;
 	MemoryRegion *sysmem, *sram, *flash_ram;
 	/*DeviceState *flashrom;*/

@@ -9,9 +9,9 @@
 
 static void msp430_cpu_initfn(Object *obj)
 {
-	MSP430CPU *cpu = MSP430_CPU(obj);
+	//MSP430CPU *cpu = MSP430_CPU(obj);
 
-    cpu_set_cpustate_pointers(cpu);
+    //cpu_set_cpustate_pointers(cpu);
 }
 
 static void g2553_initfn(Object *obj)
@@ -118,7 +118,16 @@ static void msp430_cpu_do_interrupt(CPUState *cpu)
 
 }
 
-static gchar *msp430_gdb_arch_name(CPUState *cs)
+static void msp430_restore_state_to_opc(
+				CPUState *cpu,
+				const TranslationBlock *tb,
+				const uint64_t *data
+				)
+{
+
+}
+
+static const gchar *msp430_gdb_arch_name(CPUState *cs)
 {
 	return g_strdup("msp430");
 }
@@ -136,7 +145,9 @@ struct TCGCPUOps msp430_tcg_ops = {
 	.initialize = msp430_tcg_init,
 	.cpu_exec_interrupt = msp430_cpu_exec_interrupt,
 	.do_interrupt = msp430_cpu_do_interrupt,
+	.restore_state_to_opc = msp430_restore_state_to_opc,
 };
+
 
 static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 {

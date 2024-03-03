@@ -22,27 +22,22 @@
 #define MSP430_SRAM_BASE 		(0x200)
 #define MSP430_SRAM_SIZE 		(0x100)
 
-typedef struct CPUMSP430State CPUMSP430State;
-
-struct CPUMSP430State {
+typedef struct CPUArchState {
 	uint16_t regs[16];
-};
+} CPUMSP430State;
 
 /*
 	A MSP430 CPU
 */
-typedef struct MSP430CPU {
+struct ArchCPU {
 	/* <private> */
 	CPUState parent_obj;
 
 	/* <public> */
-	CPUNegativeOffsetState neg;
 	CPUMSP430State env;
+	CPUNegativeOffsetState neg;
+};
 
-} MSP430CPU;
-
-typedef struct CPUMSP430State CPUArchState;
-typedef struct MSP430CPU ArchCPU;
 static inline int cpu_mmu_index(CPUMSP430State *env, bool ifetch)
 {
 	return 0;
@@ -50,8 +45,8 @@ static inline int cpu_mmu_index(CPUMSP430State *env, bool ifetch)
 
 #include "exec/cpu-all.h"
 
-static inline void cpu_get_tb_cpu_state(CPUMSP430State *env, target_ulong *pc,
-								target_ulong *cs_base, uint32_t *flags)
+static inline void cpu_get_tb_cpu_state(CPUMSP430State *env, vaddr *pc,
+								uint64_t *cs_base, uint32_t *flags)
 {
 	*pc = env->regs[MSP430_PC_REG];
 	*cs_base = 0;

@@ -1,18 +1,19 @@
 #include "qemu/osdep.h"
+#include "qemu/qemu-print.h"
 #include "cpu.h"
 #include "disas/disas.h"
 #include "exec/exec-all.h"
+#include "tcg/tcg.h"
 #include "tcg/tcg-op.h"
 #include "exec/helper-proto.h"
-#include "exec/cpu_ldst.h"
 #include "exec/helper-gen.h"
-#include "exec/translator.h"
-#include "qemu/qemu-print.h"
-
-#include "trace-tcg.h"
 #include "exec/log.h"
+#include "exec/cpu_ldst.h"
+#include "exec/translator.h"
 
-#include "exec/gen-icount.h"
+#define HELPER_H "helper.h"
+#include "exec/helper-info.c.inc"
+#undef HELPER_H
 
 /*
  *  Referencing the following archs for writing translation code:
@@ -72,8 +73,8 @@ static void msp430_disas_ctx_dump_state(DisasContextBase *dcbase)
 	qemu_fprintf(stderr,"num_insns %u\n", ctx->base.num_insns);
 	qemu_fprintf(stderr,"TB flags: %u\n", ctx->base.tb->flags);
 	qemu_fprintf(stderr,"TB cflags: %u\n", ctx->base.tb->cflags);
-	qemu_fprintf(stderr,"TB CS base: %u\n", ctx->base.tb->cs_base);
-	qemu_fprintf(stderr,"TB PC: %u\n", ctx->base.tb->pc);
+	qemu_fprintf(stderr,"TB CS base: %lu\n", ctx->base.tb->cs_base);
+	qemu_fprintf(stderr,"TB PC: %lu\n", ctx->base.tb->pc);
 
 	qemu_fprintf(stderr, "==============\n");
 }
@@ -83,7 +84,7 @@ static void  msp430_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs
 	qemu_fprintf(stderr, "===%s:%d===\n",__PRETTY_FUNCTION__, __LINE__);
 
 	DisasContext *ctx __attribute__((unused)) = container_of(dcbase, DisasContext, base);
-	CPUMSP430State *env __attribute__((unused)) = cs->env_ptr;
+	CPUMSP430State *env __attribute__((unused)) = cpu_env(cs);
 
 	ctx->cpu_state = cs;
 	ctx->msp430_cpu_state = env;
@@ -110,7 +111,7 @@ static void msp430_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 	qemu_fprintf(stderr, "===%s:%d===\n",__PRETTY_FUNCTION__, __LINE__);
 
 	DisasContext *ctx = container_of(dcbase, DisasContext, base);
-	CPUMSP430State *env = cpu->env_ptr;
+	CPUMSP430State *env = cpu_env(cpu);
 
 	opcode = cpu_lduw_code(env, ctx->base.pc_next);
 	qemu_fprintf(stderr, "Opcode: %u\n", opcode);
@@ -140,12 +141,7 @@ static void gen_goto_tb(DisasContext *ctx, int n, target_ulong dest)
 		tcg_gen_exit_tb(ctx->base.tb, n);
 	} else {
 		tcg_gen_movi_i32(TCGV_CPU_PC, dest);
-
-		if(ctx->base.singlestep_enabled) {
-			gen_helper_debug(cpu_env); /*TODO: Need more info on this helper function */
-		} else {
-			tcg_gen_lookup_and_goto_ptr();
-		}
+		tcg_gen_lookup_and_goto_ptr();
 	}
 
 	ctx->base.is_jmp = DISAS_NORETURN;
@@ -183,7 +179,7 @@ static void msp430_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
 			/* fall through */
 		case DISAS_EXIT:
 			if(ctx->base.singlestep_enabled) {
-				gen_helper_debug(cpu_env); /* TODO: How does this work? */
+				gen_helper_debug(tcg_env); /* TODO: How does this work? */
 			} else {
 				tcg_gen_exit_tb(NULL, 0);
 			}
@@ -194,7 +190,7 @@ static void msp430_tr_tb_stop(DisasContextBase *dcbase, CPUState *cpu)
 	qemu_fprintf(stderr, "===%s:%d===\n",__PRETTY_FUNCTION__, __LINE__);
 }
 
-static void msp430_tr_disas_log(const DisasContextBase *dcbase, CPUState *cpu)
+static void msp430_tr_disas_log(const DisasContextBase *db, CPUState *cpu, FILE *f)
 {
 	qemu_fprintf(stderr, "===%s:%d===\n",__PRETTY_FUNCTION__, __LINE__);
 }
@@ -229,7 +225,7 @@ void msp430_tcg_init(void)
 	for(i = 0; i<MSP430_NUM_REGISTERS; i++)
 	{
 		tcg_cpu_regs[i] = tcg_global_mem_new_i32(
-							cpu_env,
+							tcg_env,
 							offsetof(CPUMSP430State, regs[i]),
 							regnames[i]
 						);
@@ -239,20 +235,14 @@ void msp430_tcg_init(void)
 void gen_intermediate_code(
 			CPUState *cs,
 			TranslationBlock *tb,
-			int max_insns)
+			int *max_insns,
+			target_ulong pc,
+			void *host_pc)
 {
 	qemu_fprintf(stderr, "===%s:%d===\n", __PRETTY_FUNCTION__, __LINE__);
 	DisasContext dc = { };
-	translator_loop(&msp430_tr_ops, &dc.base, cs, tb, max_insns);
-}
-
-void restore_state_to_opc(
-				CPUArchState *env,
-				TranslationBlock *tb,
-				target_ulong *data
-				)
-{
-
+	//translator_loop(&msp430_tr_ops, &dc.base, cs, tb, max_insns);
+	translator_loop(cs, tb, max_insns, pc, host_pc, &msp430_tr_ops, &dc.base);
 }
 
 void cpu_state_reset(CPUMSP430State *env)

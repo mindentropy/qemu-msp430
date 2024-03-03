@@ -1,8 +1,12 @@
 #include "qemu/osdep.h"
+#include "qemu/error-report.h"
+#include "qemu/log.h"
 #include "cpu.h"
+#include "hw/core/tcg-cpu-ops.h"
 #include "exec/exec-all.h"
-#include "qemu/host-utils.h"
 #include "exec/log.h"
+#include "exec/cpu_ldst.h"
+#include "exec/address-spaces.h"
 #include "exec/helper-proto.h"
 
 bool msp430_cpu_tlb_fill(CPUState *cpu, vaddr address,
