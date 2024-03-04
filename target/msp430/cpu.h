@@ -22,6 +22,8 @@
 #define MSP430_SRAM_BASE 		(0x200)
 #define MSP430_SRAM_SIZE 		(0x100)
 
+#define MMU_CODE_DATA_IDX 0 /* MSP430 is Von Neumann and has both code and data in the same memory */
+
 typedef struct CPUArchState {
 	uint16_t regs[16];
 } CPUMSP430State;

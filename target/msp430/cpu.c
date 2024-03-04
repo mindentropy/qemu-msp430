@@ -7,6 +7,7 @@
 #include "exec/exec-all.h"
 #include "fpu/softfloat-helpers.h"
 
+
 static void msp430_cpu_initfn(Object *obj)
 {
 	//MSP430CPU *cpu = MSP430_CPU(obj);
@@ -148,6 +149,10 @@ struct TCGCPUOps msp430_tcg_ops = {
 	.restore_state_to_opc = msp430_restore_state_to_opc,
 };
 
+static int msp430_cpu_mmu_index(CPUState *cp, bool ifetch)
+{
+	return MMU_CODE_DATA_IDX;
+}
 
 static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 {
@@ -173,6 +178,7 @@ static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 	cc->gdb_arch_name = msp430_gdb_arch_name;
 	cc->sysemu_ops = &msp430_sysemu_ops;
 	cc->tcg_ops = &msp430_tcg_ops;
+	cc->mmu_index = msp430_cpu_mmu_index;
 
 	/* Is the below really needed? No VMEM support in the microcontroller!!!
 #ifdef CONFIG_USER_ONLY
