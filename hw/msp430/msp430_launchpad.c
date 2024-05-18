@@ -9,38 +9,46 @@
 #include "elf.h"
 #include "hw/msp430/msp430.h" /* For future expansions */
 #include "qemu/error-report.h"
+#include "qemu/qemu-print.h"
 #include "exec/memory.h"
 
-static void msp430_load_kernel(CPUMSP430State *env, const char *filename)
+
+/*static void msp430_load_firmware(CPUMSP430State *env, const char *filename)
 {
 	uint64_t entry;
-	long kernel_size;
+	long fw_size;
 
-	kernel_size = load_elf(filename,
+	fw_size = load_elf(filename,
 					NULL, NULL,
 					NULL, &entry,
 					NULL, NULL,
 					NULL, 0,
 					EM_MSP430, 1, 0);
 
-	if(kernel_size <= 0) {
+	if(fw_size <= 0) {
 		error_report("no kernel file : '%s'", filename);
 		exit(1);
+	} else {
+		qemu_fprintf(stdout, "Entry point: %ld\n", entry);
 	}
+
 	env->regs[MSP430_PC_REG] = entry;
-}
+}*/
+
 
 static void msp430_launchpad_init(MachineState *machine)
 {
-	MSP430CPU *cpu;
-	CPUMSP430State *env;
+	/*MSP430CPU *cpu;
+	CPUMSP430State *env;*/
 	MemoryRegion *sysmem, *sram, *flash_ram;
 	/*DeviceState *flashrom;*/
 
-	cpu = MSP430_CPU(cpu_create(machine->cpu_type));
-	env = &cpu->env;
+	cpu_create(machine->cpu_type);
+	/*cpu = MSP430_CPU(cpu_create(machine->cpu_type));*/
+	/* env = &cpu->env; */
 
 	sysmem = get_system_memory();
+
 	sram = g_new(MemoryRegion, 1);
 	memory_region_init_ram(
 						sram,
@@ -63,6 +71,7 @@ static void msp430_launchpad_init(MachineState *machine)
 						MSP430_FLASH_SIZE,
 						&error_fatal
 					);
+
 	memory_region_add_subregion(
 						sysmem,
 						MSP430_FLASH_BASE,
@@ -78,9 +87,9 @@ static void msp430_launchpad_init(MachineState *machine)
 /*	sysbus_realize_and_unref(SYS_BUS_DEVICE(flashrom), &error_fatal);
 	sysbus_mmio_map(SYS_BUS_DEVICE(flashrom), 0, MSP430_FLASH_BASE);*/
 
-	if(machine->kernel_filename) {
-		msp430_load_kernel(env, machine->kernel_filename);
-	}
+	/*if(machine->firmware) {
+		msp430_load_firmware(env, machine->firmware);
+	}*/
 }
 
 static void msp430_machine_init(MachineClass *mc)

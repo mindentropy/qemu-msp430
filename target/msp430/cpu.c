@@ -6,6 +6,8 @@
 #include "migration/vmstate.h"
 #include "exec/exec-all.h"
 #include "fpu/softfloat-helpers.h"
+#include "qemu/qemu-print.h"
+#include "hw/loader.h"
 
 
 static void msp430_cpu_initfn(Object *obj)
@@ -47,26 +49,59 @@ static void msp430_cpu_realizefn(
 	}
 
 	/* TODO: Check for different MSP430 CPU models and set the features */
-	cpu_reset(cs);
 	qemu_init_vcpu(cs);
+	cpu_reset(cs);
 
 	mcc->parent_realize(dev, errp);
 	return;
 }
 
-
-static void msp430_cpu_reset(DeviceState *dev)
+static void msp430_cpu_reset_hold(Object *obj)
 {
-	CPUState *s = CPU(dev);
-	MSP430CPU *cpu = MSP430_CPU(s); // DeviceState <- CpuState <- MSP430CPU
-
+	CPUState *cs = CPU(obj);
+	MSP430CPU *cpu = MSP430_CPU(cs);
 	MSP430CPUClass *mcc = MSP430_CPU_GET_CLASS(cpu);
 	CPUMSP430State *env = &cpu->env;
 
-	mcc->parent_reset(dev);
+	__attribute__((unused)) uint8_t *rom = NULL;
+	__attribute__((unused)) uint16_t initial_pc = 0;
 
-	cpu_state_reset(env);
+	if(mcc->parent_phases.hold) {
+		mcc->parent_phases.hold(obj);
+	}
+
+	memset(env->regs, 0, sizeof(env->regs));
 }
+
+__attribute__((unused)) static void msp430_cpu_reset_exit(Object *obj)
+{
+	CPUState *cs = CPU(obj);
+	MSP430CPU *cpu = MSP430_CPU(cs);
+	MSP430CPUClass *mcc = MSP430_CPU_GET_CLASS(cpu);
+
+	__attribute__((unused)) uint8_t *rom = NULL;
+	__attribute__((unused)) uint16_t initial_pc = 0;
+
+	CPUMSP430State *env = &cpu->env;
+
+	if(mcc->parent_phases.exit) {
+		mcc->parent_phases.exit(obj);
+	}
+
+	rom = rom_ptr_for_as(cs->as, 0xFFFE, 1);
+
+	if(rom) {
+		initial_pc = lduw_p(rom);
+		qemu_fprintf(stdout, "Initial_pc: 0x%x\n", initial_pc);
+	} else {
+		initial_pc = lduw_phys(cs->as, 0xFFFE);
+		qemu_fprintf(stdout, "Initial_pc: 0x%x\n", initial_pc);
+	}
+
+	env->regs[MSP430_PC_REG] = initial_pc;
+
+}
+
 
 static ObjectClass * msp430_cpu_class_by_name(const char *cpu_model)
 {
@@ -94,6 +129,12 @@ static void msp430_cpu_set_pc(CPUState *cs, vaddr value)
 	MSP430CPU *cpu = MSP430_CPU(cs);
 
 	cpu->env.regs[MSP430_PC_REG] = value & 0xFFFE;
+}
+
+static vaddr msp430_cpu_get_pc(CPUState *cs)
+{
+	MSP430CPU *cpu = MSP430_CPU(cs);
+	return cpu->env.regs[MSP430_PC_REG];
 }
 
 static void msp430_disas_set_info(CPUState *cpu, disassemble_info *info)
@@ -149,28 +190,35 @@ struct TCGCPUOps msp430_tcg_ops = {
 	.restore_state_to_opc = msp430_restore_state_to_opc,
 };
 
-static int msp430_cpu_mmu_index(CPUState *cp, bool ifetch)
+__attribute__((unused)) static int msp430_cpu_mmu_index(CPUState *cp, bool ifetch)
 {
-	return MMU_CODE_DATA_IDX;
+	return MMU_USER_IDX;
 }
 
 static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 {
-	MSP430CPUClass *mcc = MSP430_CPU_CLASS(oc);
-	CPUClass *cc = CPU_CLASS(oc);
 	DeviceClass *dc = DEVICE_CLASS(oc);
+	CPUClass *cc = CPU_CLASS(oc);
+	MSP430CPUClass *mcc = MSP430_CPU_CLASS(oc);
+	ResettableClass *rc = RESETTABLE_CLASS(oc);
 
 	device_class_set_parent_realize(dc,
 					msp430_cpu_realizefn,
 					&mcc->parent_realize);
 
-	device_class_set_parent_reset(dc,
-					msp430_cpu_reset, 
-					&mcc->parent_reset);
+	resettable_class_set_parent_phases(rc,
+						NULL,
+						msp430_cpu_reset_hold,
+						//NULL,
+						msp430_cpu_reset_exit,
+						&mcc->parent_phases);
+
 	cc->class_by_name = msp430_cpu_class_by_name;
 	cc->has_work = msp430_cpu_has_work;
 	cc->dump_state = msp430_cpu_dump_state;
+	cc->mmu_index = msp430_cpu_mmu_index;
 	cc->set_pc = msp430_cpu_set_pc;
+	cc->get_pc = msp430_cpu_get_pc;
 	cc->gdb_read_register = msp430_cpu_gdb_read_register;
 	cc->gdb_write_register = msp430_cpu_gdb_write_register;
 	cc->gdb_num_core_regs = 1; /* TODO: Setup core registers */
@@ -178,7 +226,6 @@ static void msp430_cpu_class_init(ObjectClass *oc, void *data)
 	cc->gdb_arch_name = msp430_gdb_arch_name;
 	cc->sysemu_ops = &msp430_sysemu_ops;
 	cc->tcg_ops = &msp430_tcg_ops;
-	cc->mmu_index = msp430_cpu_mmu_index;
 
 	/* Is the below really needed? No VMEM support in the microcontroller!!!
 #ifdef CONFIG_USER_ONLY

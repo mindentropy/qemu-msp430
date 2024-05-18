@@ -66,15 +66,15 @@ static void msp430_disas_ctx_dump_state(DisasContextBase *dcbase)
 	DisasContext *ctx = container_of(dcbase, DisasContext, base);
 	qemu_fprintf(stderr, "CTX Dump State\n");
 	qemu_fprintf(stderr, "==============\n");
-	qemu_fprintf(stderr,"pc_next %lu\n", ctx->base.pc_first);
-	qemu_fprintf(stderr,"pc_next %lu\n", ctx->base.pc_next);
-	qemu_fprintf(stderr,"is_jmp %u\n", ctx->base.is_jmp);
+	qemu_fprintf(stderr,"pc_first 0x%lx\n", ctx->base.pc_first);
+	qemu_fprintf(stderr,"pc_next 0x%lx\n", ctx->base.pc_next);
+	qemu_fprintf(stderr,"is_jmp 0x%x\n", ctx->base.is_jmp);
 	qemu_fprintf(stderr,"max_insns %u\n", ctx->base.max_insns);
 	qemu_fprintf(stderr,"num_insns %u\n", ctx->base.num_insns);
 	qemu_fprintf(stderr,"TB flags: %u\n", ctx->base.tb->flags);
 	qemu_fprintf(stderr,"TB cflags: %u\n", ctx->base.tb->cflags);
 	qemu_fprintf(stderr,"TB CS base: %lu\n", ctx->base.tb->cs_base);
-	qemu_fprintf(stderr,"TB PC: %lu\n", ctx->base.tb->pc);
+	qemu_fprintf(stderr,"TB PC: 0x%lx\n", ctx->base.tb->pc);
 
 	qemu_fprintf(stderr, "==============\n");
 }
@@ -90,7 +90,7 @@ static void  msp430_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs
 	ctx->msp430_cpu_state = env;
 	ctx->skip_cond = TCG_COND_NEVER;
 
-	ctx->base.max_insns = 1;
+	//ctx->base.max_insns = 1;
 }
 
 static void msp430_tr_tb_start(DisasContextBase *dcbase, CPUState *cpu)
@@ -101,28 +101,36 @@ static void msp430_tr_tb_start(DisasContextBase *dcbase, CPUState *cpu)
 
 static void msp430_tr_insn_start(DisasContextBase *dcbase, CPUState *cpu)
 {
+	DisasContext *ctx = container_of(dcbase, DisasContext, base);
+
+	tcg_gen_insn_start(ctx->base.pc_next);
 	qemu_fprintf(stderr, "===%s:%d===\n",__PRETTY_FUNCTION__, __LINE__);
-	tcg_gen_insn_start(dcbase->pc_next);
 }
 
-static void msp430_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
+static void translate(DisasContext *ctx)
 {
 	uint32_t opcode;
+
+	opcode = cpu_lduw_code(ctx->msp430_cpu_state,
+					ctx->base.pc_next);
+	qemu_fprintf(stderr, "Opcode: 0x%x\n", opcode);
+}
+
+static void msp430_tr_translate_insn(DisasContextBase *dcbase, CPUState *cs)
+{
 	qemu_fprintf(stderr, "===%s:%d===\n",__PRETTY_FUNCTION__, __LINE__);
 
 	DisasContext *ctx = container_of(dcbase, DisasContext, base);
-	CPUMSP430State *env = cpu_env(cpu);
-
-	opcode = cpu_lduw_code(env, ctx->base.pc_next);
-	qemu_fprintf(stderr, "Opcode: %u\n", opcode);
 
 	msp430_disas_ctx_dump_state(dcbase);
-	ctx->opcode = opcode;
-	ctx->base.pc_next += 2; //16 bit instruction, hence increase it by 2 bytes
-	ctx->next_pc += 2; //TODO: Redundant next_pc ???
+//	ctx->opcode = opcode;
+//	ctx->base.pc_next += 2; //16 bit instruction, hence increase it by 2 bytes
+
+	translate(ctx);
+	ctx->base.pc_next = ctx->base.pc_next + 2; //TODO: Redundant next_pc ???
 
 	if(ctx->base.is_jmp == DISAS_NEXT) {
-		target_ulong page_start;
+		target_ulong page_start = 0;
 
 		page_start = ctx->base.pc_first & TARGET_PAGE_MASK;
 
@@ -240,9 +248,9 @@ void gen_intermediate_code(
 			void *host_pc)
 {
 	qemu_fprintf(stderr, "===%s:%d===\n", __PRETTY_FUNCTION__, __LINE__);
-	DisasContext dc = { };
+	DisasContext ctx = { };
 	//translator_loop(&msp430_tr_ops, &dc.base, cs, tb, max_insns);
-	translator_loop(cs, tb, max_insns, pc, host_pc, &msp430_tr_ops, &dc.base);
+	translator_loop(cs, tb, max_insns, pc, host_pc, &msp430_tr_ops, &ctx.base);
 }
 
 void cpu_state_reset(CPUMSP430State *env)
